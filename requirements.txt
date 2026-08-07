@@ -1,0 +1,45 @@
+# Lore Matrix — curated direct dependencies (re-pinned 2026-08-03)
+# A raw `pip freeze` was replaced with only what the code actually imports.
+# Version pins match the thin-client venv. Transitive deps resolve automatically.
+
+# --- Core ETL / Data ---
+pandas==3.0.3
+numpy==2.5.0
+matplotlib==3.11.0
+openpyxl==3.1.5
+tqdm==4.68.3
+
+# --- PDF ingestion ---
+pdfplumber==0.11.10
+pypdfium2==5.10.1
+pillow==12.2.0
+
+# --- Web scraping ---
+requests==2.34.2
+beautifulsoup4==4.15.0
+
+# --- LLM pipeline (Pydantic validation, retries, console output) ---
+pydantic==2.13.4
+tenacity==9.1.4
+rich==15.0.0
+pyyaml==6.0.3
+openai==2.44.0
+
+# --- Vector vault ---
+chromadb==1.5.9
+
+# --- Testing ---
+pytest==9.1.1
+
+# ============================================================
+# OPTIONAL LAYERS — not installed on the thin client, so left
+# unpinned. Uncomment/install only on the machine that runs them.
+# (easyocr pulls torch, ~2GB. google-genai enables the Gemini provider.)
+# ============================================================
+
+# --- Vision ingestion (extract-vision.py) ---
+# easyocr
+# opencv-python-headless
+
+# --- Cloud provider (core/engines.py GeminiProvider) ---
+# google-genai

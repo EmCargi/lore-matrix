@@ -1,0 +1,51 @@
+# --- Secrets ---
+.env
+.env.*
+
+# --- Virtual environments ---
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.eggs/
+*.egg-info/
+.coverage
+htmlcov/
+
+# --- Hoppers & processed data (source vaults stay uncommitted) ---
+input_pdfs/
+input_images/
+input_manga_ocr/
+input_game_text/
+input_json/
+processed_pdfs/
+processed_images/
+processed_data/
+raw_data/
+
+# --- Derived / regenerable artifacts ---
+output/
+cache/
+backups/
+journal/
+*.db
+*.sqlite
+imported_Master_Lorebook.json
+Obsidian_Ready_Vault/
+obsidian_vault/
+TTRPG_Vault/
+vault/
+storage/chroma_vault/
+
+# --- OS / editor cruft ---
+.DS_Store
+*.swp
+*.bak
+.~lock.*#
+~lock.*#
+
+# --- Obsidian session state (churns on every open; keep vault config, ignore workspace) ---
+**/.obsidian/workspace.json
+**/.obsidian/workspace-mobile.json

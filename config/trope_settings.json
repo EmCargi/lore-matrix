@@ -1,0 +1,5 @@
+{
+  "TARGET_NAMESPACES": ["Literature", "Film", "TV", "Series", "Main"],
+  "polite_scrape_delay": 2.0,
+  "CACHE_DIR": "cache/tropes"
+}

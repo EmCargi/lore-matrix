@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lore-matrix"
+version = "4.0.0"
+description = "Offline-first multimodal ETL pipeline: ingest unstructured text, images, and game data; validate with Pydantic; dual-commit to SQLite, ChromaDB, and Obsidian."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Megane" }]
+keywords = ["etl", "llm", "pydantic", "sqlite", "chromadb", "obsidian", "rag", "data-engineering"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database :: Database Engines/Servers",
+    "Topic :: Text Processing",
+]
+
+# NOTE: Runtime dependencies are pinned in requirements.txt, which is the
+# canonical install source for both local venvs and CI.
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+# F = pyflakes (unused imports/vars, undefined names)
+# E4/E7/E9 = real syntax/flow errors
+# I = import sorting
+# UP = pyupgrade (modern syntax)
+# B = bugbear (real bug patterns)
+select = ["F", "E4", "E7", "E9", "I", "UP", "B"]
+ignore = [
+    # Blind `except Exception` is a deliberate resilience pattern in this
+    # offline-first ETL (graceful degradation over crash).
+    "BLE001",
+    # Module-level imports after a sys.path bootstrap are inherent to the
+    # project's "path-agnosticism" pattern and are intentional.
+    "E402",
+    # `yield` over an active file object keeps the handle open for closure
+    # regardless of generator consumption; leave explicit.
+    "UP028",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "config", "src"]
