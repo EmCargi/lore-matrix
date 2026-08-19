@@ -140,23 +140,13 @@ def sanitize_json_response(raw_response):
 
 
 def clean_reasoning_response(raw_response):
-    """
-    Strips reasoning tags (like <think>...</think>) based on config settings,
-    and isolates the JSON structure.
-    """
+    """Thin wrapper delegating to dev/core/reasoning.py with config-injected params."""
     from config.settings import IS_REASONING_MODEL, REASONING_TAG_NAME
-    
-    cleaned = raw_response
+    from core.reasoning import clean_reasoning_response as _shared_clean
+
     if IS_REASONING_MODEL and REASONING_TAG_NAME:
-        pattern = rf'<{REASONING_TAG_NAME}>.*?</{REASONING_TAG_NAME}>'
-        cleaned = re.sub(pattern, '', raw_response, flags=re.DOTALL).strip()
-        
-    # Try to extract the JSON array/object structure
-    json_match = re.search(r'(\[.*\]|\{.*\})', cleaned, re.DOTALL)
-    if json_match:
-        return json_match.group(1)
-        
-    return cleaned
+        return _shared_clean(raw_response, REASONING_TAG_NAME)
+    return _shared_clean(raw_response, tag_name="")
 
 
 class NarrativeEntry(BaseModel):
@@ -181,6 +171,33 @@ class LorebookEntry(BaseModel):
 class LorebookLog(BaseModel):
     entries: list[LorebookEntry]
 
+
+class MonsterAbility(BaseModel):
+    Level: int = Field(..., description="Level at which the ability is learned")
+    Skill: str = Field(..., description="Name of the skill or ability")
+    Effect: str = Field(..., description="What the ability does mechanically")
+
+
+class MonsterProfile(BaseModel):
+    Name: str = Field(..., description="Monster name exactly as written")
+    FlavorText: str = Field(..., description="The Tamer's Memo / flavor description paragraphs")
+    MaxHP: int = Field(..., description="Maximum Hit Points")
+    MaxMP: int = Field(..., description="Maximum Magic/Mana Points (0 if none)")
+    Experience: int = Field(..., description="Experience awarded on defeat")
+    Gold: int = Field(..., description="Gold dropped on defeat")
+    ElementalResistances: dict[str, int] = Field(
+        ...,
+        description="Resistance percentages for each element: Slash, Pierce, Blunt, Fire, Ice, Shock, Wind, Holy, Dark"
+    )
+    StatusResistances: dict[str, int] = Field(
+        ...,
+        description="Resistance percentages for each status: KO, Poison, Charm, Stun, Blind, Silence, Paralysis, Sleep, Confuse"
+    )
+    Abilities: list[MonsterAbility] = Field(
+        default_factory=list,
+        description="List of abilities the monster learns, with level, name, and effect"
+    )
+    Stratum: str = Field("", description="Which stratum/labyrinth the monster appears in (First,Second,Third,Fourth,Fifth,Special)")
 
 from rich.console import Console
 from rich.text import Text

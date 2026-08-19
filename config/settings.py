@@ -1,5 +1,8 @@
 import os
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))  # dev/ — shared core
 
 from core.engines import FeatherlessProvider, GeminiProvider, LocalProvider
 
@@ -50,6 +53,7 @@ TARGETS_FILE = BASE_DIR / "targets.txt"
 RAW_VAULT_DIR = BASE_DIR / "TTRPG_Vault"
 COMPILED_VAULT_DIR = BASE_DIR / "vault"
 ARCHIVEBOX_VAULT_DIR = Path(os.environ.get("ARCHIVEBOX_VAULT_DIR", BASE_DIR / "archivebox"))
+ARCHIVEBOX_URL = os.environ.get("ARCHIVEBOX_URL", "http://100.73.250.56:8040")
 INPUT_GAME_TEXT_DIR = BASE_DIR / "input_game_text"
 
 # Load system prompts dynamically from config markdown files
@@ -62,5 +66,6 @@ def load_prompt(filename):
         return ""
 
 EXTRACTOR_SYSTEM_PROMPT = load_prompt("extractor-prompt.md")
+MONSTER_EXTRACTOR_SYSTEM_PROMPT = load_prompt("monster-extractor-prompt.md")
 COMPILER_SYSTEM_PROMPT = load_prompt("compiler-prompt.md")
 VISION_EXTRACTOR_SYSTEM_PROMPT = load_prompt("vision-extractor-prompt.md")

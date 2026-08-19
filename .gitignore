@@ -49,3 +49,6 @@ storage/chroma_vault/
 # --- Obsidian session state (churns on every open; keep vault config, ignore workspace) ---
 **/.obsidian/workspace.json
 **/.obsidian/workspace-mobile.json
+
+# --- Runtime logs (regenerable) ---
+*.log

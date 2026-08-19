@@ -111,15 +111,21 @@ def extract_from_local_archive(timestamp_id, name="", active_ai=None):
     file_path = archive_dir / "singlefile.html"
     
     if not archive_dir.exists() or not file_path.exists():
-        print(f"❌ Target snapshot [{timestamp_id}] not found in local ArchiveBox vault.")
-        return False
+        print(f"⚠️ Target snapshot [{timestamp_id}] not in local ArchiveBox vault. Trying remote dashboard...")
+        try:
+            from core.archivebox import fetch_by_timestamp
+            html_content = fetch_by_timestamp(timestamp_id)
+        except Exception as e:
+            print(f"❌ Target snapshot [{timestamp_id}] not found locally or on remote ArchiveBox: {e}")
+            return False
 
-    try:
-        with open(file_path, encoding='utf-8') as f:
-            html_content = f.read()
-    except Exception as e:
-        print(f"❌ Error reading local snapshot file: {e}")
-        return False
+    else:
+        try:
+            with open(file_path, encoding='utf-8') as f:
+                html_content = f.read()
+        except Exception as e:
+            print(f"❌ Error reading local snapshot file: {e}")
+            return False
 
     try:
         soup = BeautifulSoup(html_content, 'html.parser')

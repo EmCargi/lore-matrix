@@ -1,0 +1,118 @@
+# Shota×Monsters 2 — Weebly Monster Pages
+# Format: Monster Name | https://shotaxmonsters.weebly.com/<slug>.html
+# Grouped by stratum for readability; extractor reads flat lines.
+
+# === First Stratum ===
+Slime|https://shotaxmonsters.weebly.com/slime.html
+Slime Prince|https://shotaxmonsters.weebly.com/slime-prince.html
+Goblin Fighter|https://shotaxmonsters.weebly.com/goblin-fighter.html
+Goblin Archer|https://shotaxmonsters.weebly.com/goblin-archer.html
+Goblin Shaman|https://shotaxmonsters.weebly.com/goblin-shaman.html
+Goblin Shieldman|https://shotaxmonsters.weebly.com/gobling-shieldman.html
+Goblin Leader|https://shotaxmonsters.weebly.com/goblin-leader.html
+Forest Fairy|https://shotaxmonsters.weebly.com/forest-fairy.html
+Wind Spirit|https://shotaxmonsters.weebly.com/wind-spirit.html
+Poison Slime|https://shotaxmonsters.weebly.com/poison-slime.html
+Killer Mantis|https://shotaxmonsters.weebly.com/killer-mantis.html
+Bee Fighter|https://shotaxmonsters.weebly.com/bee-fighter.html
+Honey Bee|https://shotaxmonsters.weebly.com/honey-bee.html
+Spark Bee|https://shotaxmonsters.weebly.com/spark-bee.html
+Python Snake|https://shotaxmonsters.weebly.com/python-snake.html
+Monster Plant|https://shotaxmonsters.weebly.com/monster-plant.html
+Plant Archer|https://shotaxmonsters.weebly.com/plant-archer.html
+Wild Orc|https://shotaxmonsters.weebly.com/wild-orc.html
+Rafflesia|https://shotaxmonsters.weebly.com/rafflesia.html
+Forest Bear|https://shotaxmonsters.weebly.com/forest-bear.html
+
+# === Second Stratum ===
+Candy Shooter|https://shotaxmonsters.weebly.com/candy-shooter.html
+Coffee Sugar|https://shotaxmonsters.weebly.com/coffee-suger.html
+Chocolate Knight|https://shotaxmonsters.weebly.com/chocolate-knight.html
+Melon Soda Sorcerer|https://shotaxmonsters.weebly.com/melon-soda-sorcerer.html
+Candy Hammer|https://shotaxmonsters.weebly.com/candy-hammer.html
+Jelly Slime|https://shotaxmonsters.weebly.com/jelly-slime.html
+Killer Bunny|https://shotaxmonsters.weebly.com/killer-bunny.html
+Sweet Orc|https://shotaxmonsters.weebly.com/sweet-orc.html
+King Parfait|https://shotaxmonsters.weebly.com/king-parfait.html
+Thunder Spirit|https://shotaxmonsters.weebly.com/thunder-spirit.html
+Dark Spirit|https://shotaxmonsters.weebly.com/dark-spirit.html
+Digger Ant|https://shotaxmonsters.weebly.com/digger-ant.html
+Battle Ant|https://shotaxmonsters.weebly.com/battle-ant.html
+Researcher Ant|https://shotaxmonsters.weebly.com/researcher-ant.html
+Jack-O-Lantern|https://shotaxmonsters.weebly.com/jack-o-lantern.html
+Werewolf|https://shotaxmonsters.weebly.com/werewolf.html
+Mummy|https://shotaxmonsters.weebly.com/mummy.html
+Ghost|https://shotaxmonsters.weebly.com/ghost.html
+Vampire|https://shotaxmonsters.weebly.com/vampire.html
+Puppeteer|https://shotaxmonsters.weebly.com/puppeteer.html
+
+# === Third Stratum ===
+Ice Swordsman|https://shotaxmonsters.weebly.com/ice-swordsman.html
+Ice Spirit|https://shotaxmonsters.weebly.com/ice-spirit.html
+Snow Wolf|https://shotaxmonsters.weebly.com/snow-wolf.html
+Gemini|https://shotaxmonsters.weebly.com/gemini.html
+Sweet Potato Orc|https://shotaxmonsters.weebly.com/sweet-potato-orc.html
+Snowman|https://shotaxmonsters.weebly.com/snowman.html
+Ice Golem|https://shotaxmonsters.weebly.com/ice-golem.html
+Fire Spirit|https://shotaxmonsters.weebly.com/fire-spirit.html
+Cerberus|https://shotaxmonsters.weebly.com/cerberus.html
+Demon|https://shotaxmonsters.weebly.com/demon.html
+Scorpion|https://shotaxmonsters.weebly.com/scorpion.html
+Demon Slime|https://shotaxmonsters.weebly.com/demon-slime.html
+Red Dragon|https://shotaxmonsters.weebly.com/red-dragon.html
+Phoenix|https://shotaxmonsters.weebly.com/phoenix.html
+Blue Planeswalker|https://shotaxmonsters.weebly.com/blue-planeswalker.html
+Blue Knight|https://shotaxmonsters.weebly.com/blue-knight.html
+Blue Dragon|https://shotaxmonsters.weebly.com/blue-dragon.html
+Lamp Genie|https://shotaxmonsters.weebly.com/lamp-genie.html
+Red Knight|https://shotaxmonsters.weebly.com/red-knight.html
+Freezeburn Dragon|https://shotaxmonsters.weebly.com/freezeburn-dragon.html
+
+# === Fourth Stratum ===
+Spirit Prankster|https://shotaxmonsters.weebly.com/spirit-prankster.html
+Pinwheel|https://shotaxmonsters.weebly.com/pinwheel.html
+Fuurai Orc|https://shotaxmonsters.weebly.com/fuurai-orc.html
+Karakasa|https://shotaxmonsters.weebly.com/karakasa.html
+Footsoldier|https://shotaxmonsters.weebly.com/footsoldier.html
+Yojimbo|https://shotaxmonsters.weebly.com/yojimbo.html
+Ninja|https://shotaxmonsters.weebly.com/ninja.html
+Zashiki Warashi|https://shotaxmonsters.weebly.com/zashiki-warashi.html
+Dogu Armor|https://shotaxmonsters.weebly.com/dogu-armor.html
+Kamaitachi|https://shotaxmonsters.weebly.com/kamaitachi.html
+Tsuchigumo|https://shotaxmonsters.weebly.com/tsuchigumo.html
+Ninja Master|https://shotaxmonsters.weebly.com/ninja-master.html
+Onmyoji|https://shotaxmonsters.weebly.com/onmyoji.html
+Lion Dancer|https://shotaxmonsters.weebly.com/lion-dancer.html
+Shogun|https://shotaxmonsters.weebly.com/shogun.html
+Crow Tengu|https://shotaxmonsters.weebly.com/crow-tengu.html
+Prodigy|https://shotaxmonsters.weebly.com/prodigy.html
+Raiju|https://shotaxmonsters.weebly.com/raiju.html
+Blue Oni|https://shotaxmonsters.weebly.com/blue-oni.html
+Nine-Tailed Fox|https://shotaxmonsters.weebly.com/nine-tailed-fox.html
+
+# === Fifth Stratum ===
+Angel|https://shotaxmonsters.weebly.com/angel.html
+Principality|https://shotaxmonsters.weebly.com/principality.html
+Power|https://shotaxmonsters.weebly.com/power.html
+Virtue|https://shotaxmonsters.weebly.com/virtue.html
+Dominion|https://shotaxmonsters.weebly.com/dominion.html
+Adam Orc|https://shotaxmonsters.weebly.com/adam-orc.html
+Light Spirit|https://shotaxmonsters.weebly.com/light-spirit.html
+Incubus|https://shotaxmonsters.weebly.com/incubus.html
+Michael|https://shotaxmonsters.weebly.com/michael.html
+Gabriel|https://shotaxmonsters.weebly.com/gabriel.html
+Astaroth|https://shotaxmonsters.weebly.com/astaroth.html
+Nebiros|https://shotaxmonsters.weebly.com/nebiros.html
+Pazuzu|https://shotaxmonsters.weebly.com/pazuzu.html
+Mephisto|https://shotaxmonsters.weebly.com/mephisto.html
+Belphagor|https://shotaxmonsters.weebly.com/belphagor.html
+Bugbear|https://shotaxmonsters.weebly.com/bugbear.html
+Beelzebub|https://shotaxmonsters.weebly.com/beelzebub.html
+Baphomet|https://shotaxmonsters.weebly.com/baphomet.html
+Lucifer|https://shotaxmonsters.weebly.com/lucifer.html
+
+# === Special Monsters ===
+Odin|https://shotaxmonsters.weebly.com/odin.html
+Slayer|https://shotaxmonsters.weebly.com/slayer.html
+Soul Collector|https://shotaxmonsters.weebly.com/soul-collector.html
+Abyss Lord|https://shotaxmonsters.weebly.com/abyss-lord.html

@@ -4,6 +4,8 @@ import os
 # THE AI PROVIDER MODULES (The Decoupled LLM Adapters)
 # =====================================================================
 
+from core.ollama import default_chain, post_json
+
 class GeminiProvider:
     def __init__(self, model_name="gemini-2.5-flash-preview-09-2025"):
         # Uses the modern google-genai library
@@ -64,27 +66,29 @@ class FeatherlessProvider:
             return response.choices[0].message.content
 
 class LocalProvider:
-    def __init__(self, model_name="deepseek-r1:7b"):
+    def __init__(self, model_name="deepseek-r1:7b", base_url=None):
+        # deepseek-r1:7b lives on the thin client only. The big rig is the
+        # primary engine and serves qwen2.5-coder:14b for the same task; the
+        # requested model names the thin-client fallback. Both overridable.
         self.model_name = model_name
+        primary_model = os.environ.get("OLLAMA_PRIMARY_MODEL", "qwen2.5-coder:14b")
+        self.chain = default_chain(primary_model, model_name)
 
     def generate(self, system_prompt, user_content, response_format=None):
-        import requests
-        url = "http://localhost:11434/api/chat"
-        payload = {
-            "model": self.model_name,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content}
-            ],
-            "stream": False,
-            "options": {
-                "temperature": 0.3
+        def _payload(model):
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content}
+                ],
+                "stream": False,
+                "options": {
+                    "temperature": 0.3
+                }
             }
-        }
-        if response_format:
-            payload["format"] = response_format.model_json_schema()
-            
-        res = requests.post(url, json=payload)
-        res.raise_for_status()
-        res_json = res.json()
-        return res_json["message"]["content"]
+            if response_format:
+                payload["format"] = response_format.model_json_schema()
+            return payload
+
+        return post_json("/api/chat", _payload, self.chain)["message"]["content"]

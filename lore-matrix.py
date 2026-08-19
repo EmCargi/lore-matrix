@@ -291,6 +291,38 @@ def run_slicer_wizard():
     run_script("src/utils/md_slicer.py", input_file, "--output-dir", output_dir)
 
 
+def run_narrative_extractor_wizard():
+    """
+    Interactive wizard to extract NME-compatible narrative structure from prose.
+    """
+    input_file = input("Enter path to prose narrative file (.txt/.md): ").strip()
+    if not input_file:
+        print("⚠️ Input file path cannot be empty.")
+        return
+
+    engine = input("AI engine [local/gemini/featherless, default: local]: ").strip().lower()
+    if engine not in ("local", "gemini", "featherless", ""):
+        print("⚠️ Invalid engine. Defaulting to local.")
+        engine = "local"
+    elif not engine:
+        engine = "local"
+
+    model = input("Model name (optional, press Enter to skip): ").strip()
+    host = input("Ollama host URL (optional, Enter for localhost): ").strip()
+    emit_nme = input("NME vault path to auto-emit (optional, Enter to skip): ").strip()
+
+    cmd_args = ["--input", input_file, "--engine", engine]
+    if model:
+        cmd_args.extend(["--model", model])
+    if host:
+        cmd_args.extend(["--host", host])
+    if emit_nme:
+        cmd_args.extend(["--emit-to-nme", emit_nme])
+
+    print(f"\n🚀 Launching extract-narrative.py...")
+    run_script("extract-narrative.py", *cmd_args)
+
+
 
 def main():
     while True:
@@ -322,10 +354,11 @@ def main():
         print("11. Advanced: Run Individual Ingestors Submenu")
         print("12. Ingest Frozen Asset from ArchiveBox (via Timestamp ID)")
         print("13. Slice Monolithic Markdown File (md_slicer.py)")
-        print("14. Exit")
+        print("14. Extract Narrative Structure (extract-narrative.py)")
+        print("15. Exit")
         print("================================================================================================")
-        
-        choice = input("Enter choice (1-14): ").strip()
+
+        choice = input("Enter choice (1-15): ").strip()
         
         if choice == '1':
             model_input = input("Enter processing model override (optional, press Enter to skip): ").strip()
@@ -436,10 +469,12 @@ def main():
         elif choice == '13':
             run_slicer_wizard()
         elif choice == '14':
+            run_narrative_extractor_wizard()
+        elif choice == '15':
             print("\nGoodbye!")
             break
         else:
-            print("\n⚠️ Invalid choice. Please enter a number between 1 and 14.")
+            print("\n⚠️ Invalid choice. Please enter a number between 1 and 15.")
             
         input("\nPress Enter to return to the main menu...")
 

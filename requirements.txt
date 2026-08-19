@@ -25,6 +25,9 @@ rich==15.0.0
 pyyaml==6.0.3
 openai==2.44.0
 
+# --- Visualization ---
+networkx==3.6.1
+
 # --- Vector vault ---
 chromadb==1.5.9
 
