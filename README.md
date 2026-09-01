@@ -1,6 +1,6 @@
 # 🌌 Lore Matrix (V4)
 
-[![CI](https://github.com/EmCargi/lore-matrix/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR-USERNAME/lore-matrix/actions/workflows/ci.yml)
+[![CI](https://github.com/EmCargi/lore-matrix/actions/workflows/ci.yml/badge.svg)](https://github.com/EmCargi/lore-matrix/actions/workflows/ci.yml)
 ![Python 3.11 | 3.12](https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Lint: ruff](https://img.shields.io/badge/lint-ruff-D7FF64.svg)

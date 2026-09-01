@@ -102,4 +102,4 @@ preserved (and where needed, hardened) in V4; see the `[4.0.0]` entry above for 
 
 ## Unreleased
 
-- Swap `YOUR-USERNAME` in `README.md` badge to the real GitHub handle once the repo is final.
+- ~~Swap `YOUR-USERNAME` in `README.md` badge to the real GitHub handle~~ → **Fixed 2026-09-01** (`EmCargi`).
