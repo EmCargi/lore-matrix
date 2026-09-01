@@ -1,16 +1,17 @@
 ---
 project: lore-matrix
-date: 2026-08-15
+date: 2026-09-01
 status: active
-test_count: 88
+test_count: 91
 git: local-only
 extractors: 9 (web, head, ocean, narrative, launchpad, tables, pdf, vision, monsters)
+browser: browser_lore_matrix.py (Streamlit dashboard)
 ---
 # Lore Matrix — Handoff Document
 
 ## Current State (2026-08-15)
 
-Lore Matrix V4 is the **central ETL and visualization hub** of the workspace — the ingestion layer that feeds sibling projects (VSPE, NME, HEAD, Choir Cloud). It ingests unstructured sources (PDFs, web pages, ArchiveBox snapshots, manga OCR, images, RPG game text, TV Tropes), normalizes them through strict Pydantic schemas, and persists to SQLite, ChromaDB, and Obsidian. 88 tests (86 green + 2 pre-existing), `ruff` clean, CI-gated on GitHub Actions (Python 3.11 / 3.12).
+Lore Matrix V4 is the **central ETL and visualization hub** of the workspace — the ingestion layer that feeds sibling projects (VSPE, NME, HEAD, Choir Cloud). It ingests unstructured sources (PDFs, web pages, ArchiveBox snapshots, manga OCR, images, RPG game text, TV Tropes), normalizes them through strict Pydantic schemas, and persists to SQLite, ChromaDB, and Obsidian. 91 tests all green, `ruff` clean, CI-gated on GitHub Actions (Python 3.11 / 3.12). A Streamlit browser dashboard (`browser_lore_matrix.py`) replaces the CLI menu for interactive use — ingest, visualize, query databases, and export from the browser.
 
 ## Lineage
 
@@ -28,6 +29,7 @@ Lore Matrix V4 is the **central ETL and visualization hub** of the workspace —
 | 2026-08-14 | `2026-08-14-head-cli-meso-extractor.md` | `2026-08-14-head-cli-meso-extractor-shipped.md` | **extract-head.py** — cold institutional meso-slider scorer (H.E.A.D. 4-slider taxonomy) via big-rig gemma4-v2, emits head-cli-compatible fixture YAML |
 | 2026-08-15 | `digital-dm-project/shota-monsters-digital-dm/besm/world-lore/pipeline-scope.md` | `2026-08-15-shota-monsters-pipeline-verification.md`, `2026-08-15-master-monster-db-import.md`, `2026-08-15-master-db-catalog-import.md` | **extract-monsters.py** — Weebly monster stat block extractor (103 SxM1 monsters, 0 failures). **monsters-to-md.py** — JSON → Obsidian-ready markdown by stratum. New `MonsterProfile` + `MonsterAbility` Pydantic models + `monster-extractor-prompt.md`. New sibling: digital-dm-project |
 | 2026-08-15 | — | `2026-08-15-archivebox-preservation-layer.md` | **ArchiveBox remote read path** — `extract-web.py` reads the big-rig vault over Tailscale via `dev/core/archivebox.py` (local vault first, remote fallback, `output.html` ladder). `ARCHIVEBOX_URL` added to config |
+| 2026-09-01 | — | — | **browser_lore_matrix.py** — Streamlit browser dashboard (7 tabs: Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). Follows `browser_aeiou.py` / `browser_nme.py` / `browser_choir_cloud.py` pattern. 91 tests, `ruff` clean. Streamlit + plotly added to requirements. |
 
 ## Architecture Overview
 
@@ -69,6 +71,7 @@ Persistence: Obsidian vault · SQLite · ChromaDB
 
 | File | Purpose | Lines | Tests |
 |---|---|---|---|
+| `browser_lore_matrix.py` | Streamlit browser dashboard (ingest, visualize, query, export) | ~564 | — |
 | `lore-matrix.py` | Master CLI menu (15 options, subprocess orchestrator) | ~482 | — |
 | `ingest.py` | Polymorphic gateway router (auto-detects input type, routes to extractor) | ~273 | — |
 | `extract-pdf.py` | PDF harvester (pdfplumber + LLM → LorebookLog) | ~157 | — |
@@ -231,7 +234,7 @@ class StoryEdge(BaseModel):
 - Visualization engine (bar, line, box, scatter3d, animate3d, network + MIDI JSON support)
 - Polymorphic gateway router (auto-detects input type)
 - Master CLI menu (15 options)
-- 88 tests green (86 pass + 2 pre-existing failures: test_network_chart, test_dual_commit collection error), `ruff` clean, CI on GitHub Actions
+- Streamlit browser dashboard (interactive ingest, visualize, query, export)
 - Git local-only (2 commits, no remote by design — though a GitHub remote exists for portfolio)
 
 ## What Doesn't Work Yet
@@ -275,6 +278,12 @@ venv/bin/python extract-ocean.py profile --input bio.txt --model "gemma2:2b"
 OLLAMA_PRIMARY_MODEL="gemma4-v2-Q6_K.gguf:latest" venv/bin/python extract-head.py profile -i institution.txt --out sparta --overwrite
 OLLAMA_PRIMARY_MODEL="gemma4-v2-Q6_K.gguf:latest" venv/bin/python extract-head.py profile -i detail.txt --out sparta --schein-only --overwrite
 ```
+
+### Run the browser dashboard
+```bash
+streamlit run browser_lore_matrix.py
+```
+Replaces the CLI menu with an interactive Streamlit dashboard — ingest, visualize, query databases, browse JSON staging, and export to Obsidian from the browser.
 
 ### Load data into SQLite
 ```bash
@@ -333,4 +342,4 @@ venv/bin/python core/visualize-data.py --input midi.json --chart-type animate3d 
 
 ---
 
-*Handoff updated 2026-08-15. Lore Matrix V4 — the ingestion hub feeding all 6 siblings. extract-head.py ships the cold institution scoring toolchain: foreign governance text → big-rig gemma4-v2 → MesoTierLLM → head-cli fixture YAML. 2026-08-15 additions: extract-monsters.py (103 SxM1 monsters → digital-dm-project) and the ArchiveBox remote read path (big-rig vault over Tailscale). 88 tests. Gorbachev out-of-sample rerun: ΔF 0.595 → Subversion Catalyst.*
+*Handoff updated 2026-09-01. Lore Matrix V4 — the ingestion hub feeding all 6 siblings. extract-head.py ships the cold institution scoring toolchain: foreign governance text → big-rig gemma4-v2 → MesoTierLLM → head-cli fixture YAML. 2026-08-15 additions: extract-monsters.py (103 SxM1 monsters → digital-dm-project) and the ArchiveBox remote read path (big-rig vault over Tailscale). 2026-09-01 addition: browser_lore_matrix.py — Streamlit dashboard with 7 tabs (Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). 91 tests. Gorbachev out-of-sample rerun: ΔF 0.595 → Subversion Catalyst.*

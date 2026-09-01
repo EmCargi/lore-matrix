@@ -27,6 +27,8 @@ openai==2.44.0
 
 # --- Visualization ---
 networkx==3.6.1
+plotly==6.3.1
+streamlit==1.61.1
 
 # --- Vector vault ---
 chromadb==1.5.9
