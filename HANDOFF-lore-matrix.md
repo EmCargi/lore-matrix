@@ -251,7 +251,7 @@ class StoryEdge(BaseModel):
 | `requirements.txt` is curated but optional layers commented out | Vision/Gemini deps must be manually uncommented + installed | Low — uncomment + pip install |
 | `extract-vision.py` can't run on thin client | Vision ingestion is big-rig-only | By design (optional layer) |
 | ~~GitHub badge has `YOUR-USERNAME` placeholder~~ | Cosmetic | ✅ Fixed 2026-09-01 — replaced with `EmCargi` |
-| Git has a GitHub remote (portfolio) but AGENTS.md says "no remote" | Tension between portfolio display and local-first mandate | Megane's call — remote is read-only portfolio, not a workflow remote |
+| ~~Git has a GitHub remote (portfolio) but AGENTS.md says "no remote"~~ | Tension between portfolio display and local-first mandate | ✅ Resolved 2026-09-01 — remotes now reserved for big-rig-hosted, production-ready projects only. `origin` removed from thin-client lore-matrix repo. AGENTS.md updated with formal remote policy. |
 | Multiple SQLite DBs (cannabis_lab.db, coursework.db, game_vault.db) | No unified schema — each loader creates its own | By design (sandbox pattern) |
 
 ## How to Extend
@@ -334,10 +334,9 @@ venv/bin/python core/visualize-data.py --input midi.json --chart-type animate3d 
 ## Next Session Priorities
 
 1. **ChromaDB index for digital-dm** — `build_chromadb.py` exists in digital-dm-project, needs duplicate-ID fix (level-appended ability IDs) and clean run (~3,975 documents, ~30 min via big-rig nomic-embed-text)
-2. **Resolve the git remote tension** — either remove `origin` to fully honor "no remote by design," or document it as read-only portfolio display
-3. **Interactive scrubbing** in `core/visualize-data.py` — matplotlib slider is basic
-5. **Consolidate `json-to-md.py` and `md-to-obsidian.py`** — overlapping functionality, may merge
-6. **Consider a unified DB schema** — multiple ad-hoc SQLite DBs (cannabis_lab, coursework, game_vault) could share a migration framework
+2. **Interactive scrubbing** in `core/visualize-data.py` — matplotlib slider is basic
+3. **Consolidate `json-to-md.py` and `md-to-obsidian.py`** — overlapping functionality, may merge
+4. **Consider a unified DB schema** — multiple ad-hoc SQLite DBs (cannabis_lab, coursework, game_vault) could share a migration framework
 
 ---
 
