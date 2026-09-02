@@ -2,7 +2,7 @@
 project: lore-matrix
 date: 2026-09-01
 status: active
-test_count: 94
+test_count: 103
 git: local-only
 extractors: 9 (web, head, ocean, narrative, launchpad, tables, pdf, vision, monsters)
 browser: browser_lore_matrix.py (Streamlit dashboard)
@@ -11,7 +11,7 @@ browser: browser_lore_matrix.py (Streamlit dashboard)
 
 ## Current State (2026-08-15)
 
-Lore Matrix V4 is the **central ETL and visualization hub** of the workspace — the ingestion layer that feeds sibling projects (VSPE, NME, HEAD, Choir Cloud). It ingests unstructured sources (PDFs, web pages, ArchiveBox snapshots, manga OCR, images, RPG game text, TV Tropes), normalizes them through strict Pydantic schemas, and persists to SQLite, ChromaDB, and Obsidian. 94 tests all green, `ruff` clean, CI-gated on GitHub Actions (Python 3.11 / 3.12). A Streamlit browser dashboard (`browser_lore_matrix.py`) replaces the CLI menu for interactive use — ingest, visualize, query databases, and export from the browser.
+Lore Matrix V4 is the **central ETL and visualization hub** of the workspace — the ingestion layer that feeds sibling projects (VSPE, NME, HEAD, Choir Cloud). It ingests unstructured sources (PDFs, web pages, ArchiveBox snapshots, manga OCR, images, RPG game text, TV Tropes), normalizes them through strict Pydantic schemas, and persists to SQLite, ChromaDB, and Obsidian. 103 tests all green, `ruff` clean, CI-gated on GitHub Actions (Python 3.11 / 3.12). A Streamlit browser dashboard (`browser_lore_matrix.py`) replaces the CLI menu for interactive use — ingest, visualize, query databases, and export from the browser.
 
 ## Lineage
 
@@ -31,6 +31,7 @@ Lore Matrix V4 is the **central ETL and visualization hub** of the workspace —
 | 2026-08-15 | — | `2026-08-15-archivebox-preservation-layer.md` | **ArchiveBox remote read path** — `extract-web.py` reads the big-rig vault over Tailscale via `dev/core/archivebox.py` (local vault first, remote fallback, `output.html` ladder). `ARCHIVEBOX_URL` added to config |
 | 2026-09-01 | — | — | **browser_lore_matrix.py** — Streamlit browser dashboard (7 tabs: Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). Follows `browser_aeiou.py` / `browser_nme.py` / `browser_choir_cloud.py` pattern. 91 tests, `ruff` clean. Streamlit + plotly added to requirements. |
 | 2026-09-02 | `2026-09-01-lore-matrix-interactive-scrubbing.md` | `2026-09-02-lore-matrix-interactive-scrubbing.md` | **Interactive scrubbing** in `core/visualize-data.py` — new `--chart-type interactive` (matplotlib Slider + Button): manual frame scrub, fading trail, auto-play, arrow-key stepping, headless fallback to GIF. Counterplan `2026-09-02-lore-matrix-interactive-scrubbing.md`. 94 tests. |
+| 2026-09-02 | `2026-09-02-lore-matrix-exporter-consolidation.md` | `2026-09-02-lore-matrix-exporter-consolidation.md` | **Unified Obsidian exporter** — pure `core/raw_vault_builder.py` (no-LLM JSON→raw unwrap, SillyTavern world-info preserved), `json_to_obsidian.py --phase raw/compile/one-shot` (lazy `ACTIVE_AI` in config.settings), legacy `json-to-md.py` + `md-to-obsidian.py` deleted. Counterplan `2026-09-02-lore-matrix-exporter-consolidation.md`. 103 tests. |
 
 ## Architecture Overview
 
@@ -55,9 +56,8 @@ ingest.py ── Polymorphic Gateway Router (auto-detects input type)
     ▼
 output/json_staging/  ── Hierarchical, category-mirrored staging
     │
-    ├──▶ json_to_obsidian.py     ── JSON → Obsidian notes (hash-cached, parallel, wiki-linked)
+    ├──▶ json_to_obsidian.py     ── JSON → Obsidian (--phase raw no-LLM / compile / one-shot)
     ├──▶ json-to-lorebook.py     ── JSON → SillyTavern lorebook (per-universe)
-    ├──▶ json-to-md.py           ── JSON → Markdown
     ├──▶ sql-loader.py           ── CSV/XLSX → SQLite (idempotent upsert)
     ├──▶ dual_commit.py          ── Game dialogue → SQLite + ChromaDB
     └──└▶ sql-to-md.py           ── SQLite → Obsidian Markdown
@@ -87,8 +87,6 @@ Persistence: Obsidian vault · SQLite · ChromaDB
 | `extract-head.py` | Meso-tier institution scorer (text → LLM → MesoTierLLM → head-cli fixture YAML), --schein-only, --overwrite | ~200 | — |
 | `import-json.py` | SillyTavern lorebook JSON importer | ~184 | — |
 | `json-to-lorebook.py` | Per-universe lorebook compiler | ~120 | — |
-| `json-to-md.py` | JSON → Markdown exporter | ~117 | — |
-| `md-to-obsidian.py` | Markdown → Obsidian vault syncer | ~83 | — |
 | `jsonl-to-prose.py` | JSONL → prose converter | ~138 | — |
 | `sql-loader.py` | Generic CSV/XLSX → SQLite (strategy-driven, idempotent upsert) | ~176 | 8 |
 | `sql-to-md.py` | SQLite → Obsidian Markdown exporter | ~269 | — |
@@ -100,13 +98,14 @@ Persistence: Obsidian vault · SQLite · ChromaDB
 | `core/concurrency.py` | Canonical RateLimiter + make_safe_print (thread-safe) | ~41 | — |
 | `core/image_processing.py` | OCR enhancement (CLAHE, deskew, binarize, bilateral denoise) | ~85 | — |
 | `core/visualize-data.py` | Chart engine (bar/line/box/scatter3d/animate3d/interactive/network + MIDI JSON) | ~749 | 11 |
+| `core/raw_vault_builder.py` | **Pure JSON → raw markdown unwrapper (no-LLM by construction — no provider imports)** | ~200 | 5 |
 | `core/narrative_types.py` | NME-compatible Pydantic models (StoryNode, StoryEdge, Perspective, etc.) | ~53 | 4 |
 | `core/ocean_types.py` | OceanProfile Pydantic model (Big Five percentiles) | ~49 | 6 |
 | `core/ocean_scalpel.py` | JSON extraction scalpel (defends against reasoning-model noise) | ~63 | 7 |
 | `core/launchpad_types.py` | LaunchpadFeatures Pydantic model (institutional features) | ~33 | 5 |
 | `core/meso_types.py` | MesoTierLLM + ScheinAudit + ScheinOnly Pydantic models (H.E.A.D. 4-slider) | ~74 | 9 |
 | **`src/`** | | | |
-| `src/transformers/json_to_obsidian.py` | Obsidian compiler (hash-cache, parallel, wiki-link, YAML validation) | ~682 | 4 |
+| `src/transformers/json_to_obsidian.py` | Obsidian compiler — `--phase raw` (no-LLM) / `--phase compile` / one-shot (hash-cache, parallel, wiki-link, YAML validation) | ~590 | 5 |
 | `src/transformers/meta_archivist.py` | Trope ETL → metadata archive | ~277 | — |
 | `src/scrapers/trope_scraper.py` | TV Tropes harvester → TropeModel | ~298 | — |
 | `src/storage/dual_commit.py` | Game dialogue → SQLite + ChromaDB dual-commit | ~137 | 1 |
@@ -225,6 +224,7 @@ class StoryEdge(BaseModel):
 - JSON import (SillyTavern lorebooks)
 - TV Tropes scraping + ChromaDB vault
 - Obsidian compilation (parallel, hash-cached, wiki-linked, YAML-validated)
+- JSON → Obsidian export with `--phase` (raw no-LLM unwrap / compile / one-shot)
 - SillyTavern lorebook compilation (per-universe)
 - SQL loading (CSV/XLSX → SQLite, idempotent upsert)
 - SQLite → Obsidian Markdown export
@@ -291,6 +291,18 @@ Replaces the CLI menu with an interactive Streamlit dashboard — ingest, visual
 venv/bin/python sql-loader.py --input data.csv --db library.db --table characters --key id
 ```
 
+### Export JSON → Obsidian (unified exporter, three modes)
+```bash
+# raw: JSON chunks → RAW_VAULT_DIR (TTRPG_Vault) — NO LLM, pure unwrap
+venv/bin/python src/transformers/json_to_obsidian.py --phase raw
+
+# compile: RAW_VAULT_DIR → COMPILED_VAULT_DIR (vault) — LLM compile
+venv/bin/python src/transformers/json_to_obsidian.py --phase compile
+
+# one-shot: JSON → compiled (default, unchanged behavior)
+venv/bin/python src/transformers/json_to_obsidian.py
+```
+
 ### Visualize
 ```bash
 venv/bin/python core/visualize-data.py --input data.csv --chart-type scatter3d --x-col x --y-col y,z --output cloud.png
@@ -341,9 +353,9 @@ venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive
 
 1. **ChromaDB index for digital-dm** — `build_chromadb.py` exists in digital-dm-project, needs duplicate-ID fix (level-appended ability IDs) and clean run (~3,975 documents, ~30 min via big-rig nomic-embed-text). *Note: fix + clean run done 2026-09-02 — 5,625 vectors, IDs now species_id-based + effect-hash disambiguated.*
 2. ~~**Interactive scrubbing** in `core/visualize-data.py`~~ — **Shipped 2026-09-02** as `--chart-type interactive` (slider, trail, auto-play, arrow keys). Remaining: live GUI smoke test + Streamlit Plotly port for the Visualizer tab.
-3. **Consolidate `json-to-md.py` and `md-to-obsidian.py`** — overlapping functionality, may merge
+3. ~~**Consolidate `json-to-md.py` and `md-to-obsidian.py`**~~ — **Shipped 2026-09-02**: pure `core/raw_vault_builder.py` (no-LLM) + `json_to_obsidian.py --phase raw/compile`; legacy pair deleted.
 4. **Consider a unified DB schema** — multiple ad-hoc SQLite DBs (cannabis_lab, coursework, game_vault) could share a migration framework
 
 ---
 
-*Handoff updated 2026-09-02. Lore Matrix V4 — the ingestion hub feeding all 6 siblings. extract-head.py ships the cold institution scoring toolchain: foreign governance text → big-rig gemma4-v2 → MesoTierLLM → head-cli fixture YAML. 2026-08-15 additions: extract-monsters.py (103 SxM1 monsters → digital-dm-project) and the ArchiveBox remote read path (big-rig vault over Tailscale). 2026-09-01 addition: browser_lore_matrix.py — Streamlit dashboard with 7 tabs (Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). 2026-09-02 additions: `--chart-type interactive` scrubbing in the visualizer (slider/trail/auto-play/arrow keys, headless GIF fallback) and the digital-dm ChromaDB rebuild (5,625 vectors, duplicate-ID fix). 94 tests.*
+*Handoff updated 2026-09-02. Lore Matrix V4 — the ingestion hub feeding all 6 siblings. extract-head.py ships the cold institution scoring toolchain: foreign governance text → big-rig gemma4-v2 → MesoTierLLM → head-cli fixture YAML. 2026-08-15 additions: extract-monsters.py (103 SxM1 monsters → digital-dm-project) and the ArchiveBox remote read path (big-rig vault over Tailscale). 2026-09-01 addition: browser_lore_matrix.py — Streamlit dashboard with 7 tabs (Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). 2026-09-02 additions: `--chart-type interactive` scrubbing (slider/trail/auto-play/arrow keys, headless GIF fallback), the digital-dm ChromaDB rebuild (5,625 vectors, duplicate-ID fix), and the unified Obsidian exporter (pure no-LLM raw vault builder + `--phase raw/compile`; lazy `ACTIVE_AI`). 103 tests.*

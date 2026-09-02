@@ -190,7 +190,8 @@ A uniform factory exposing `generate(system_prompt, user_content, response_forma
 | `sql-to-md.py` | SQLite → Obsidian Markdown exporter |
 | `data-profile.py` | Dataset health audit / sanitization gate |
 | `db-migrate.py` | SQLite snapshot & rollback manager |
-| `json-to-lorebook.py` · `json-to-md.py` · `import-json.py` · `md-to-obsidian.py` | SillyTavern / Obsidian compilers & importers |
+| `json-to-lorebook.py` · `import-json.py` | SillyTavern lorebook compilers & importers |
+| `src/transformers/json_to_obsidian.py` | Unified Obsidian exporter — `--phase raw` (no-LLM JSON→raw), `--phase compile` (raw→compiled), or one-shot |
 
 ### `core/`, `src/`
 | Path | Role |

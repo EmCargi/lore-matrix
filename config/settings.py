@@ -35,7 +35,21 @@ def get_ai_provider(engine_name=None, model_name=None):
         model = model_name or ACTIVE_VISION_MODEL
         return LocalProvider(model_name=model)
 
-ACTIVE_AI = get_ai_provider()
+# ACTIVE_AI is lazily constructed via get_active_ai() / module __getattr__ so
+# importing config.settings (e.g. for path constants) never wakes up a provider.
+_ACTIVE_AI = None
+
+def get_active_ai():
+    """Lazily construct and cache the active provider (import-safe)."""
+    global _ACTIVE_AI
+    if _ACTIVE_AI is None:
+        _ACTIVE_AI = get_ai_provider()
+    return _ACTIVE_AI
+
+def __getattr__(name):
+    if name == "ACTIVE_AI":
+        return get_active_ai()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # Pipeline Constraints & Limits
 ACTIVE_SYSTEM = "BFRPG"

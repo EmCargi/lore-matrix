@@ -73,14 +73,21 @@ if project_root not in sys.path:
 
 # Import config settings
 from config.settings import (
-    ACTIVE_SYSTEM,
     BASE_DIR,
     COMPILED_VAULT_DIR,
     COMPILER_SYSTEM_PROMPT,
     OUTPUT_CHUNKS_DIR,
+    RAW_VAULT_DIR,
     get_ai_provider,
 )
 from core.concurrency import RateLimiter, make_safe_print
+from core.raw_vault_builder import (
+    build_raw_markdown_in_memory,
+    extract_entries_from_json,
+    parse_keys,
+    sweep_chunk_files,
+    write_raw_vault,
+)
 from core.utils import LorebookEntry, LorebookLog, NarrativeLog
 
 # Thread-safe printing to prevent stdout interleaving
@@ -89,30 +96,15 @@ print = make_safe_print()
 # Vault output root directory inside project
 VAULT_ROOT_DIR = COMPILED_VAULT_DIR
 
-def parse_keys(key_val):
-    """
-    Parses key inputs of varying types into a list of clean trigger strings.
-    """
-    if not key_val:
-        return []
-    if isinstance(key_val, list):
-        return [str(k).strip() for k in key_val if str(k).strip()]
-    if isinstance(key_val, str):
-        for sep in [",", ";"]:
-            if sep in key_val:
-                return [k.strip() for k in key_val.split(sep) if k.strip()]
-        return [key_val.strip()]
-    return [str(key_val).strip()]
-
-
 def map_sillytavern_entry(uid, entry_dict):
     """
     Map SillyTavern entry structure to LorebookEntry schema.
     """
-    raw_keys = entry_dict.get('key', [])
+    raw_keys = entry_dict.get('key') or entry_dict.get('keys') or []
     raw_keys_sec = entry_dict.get('keysecondary', [])
-    
-    combined_keys = list(set(parse_keys(raw_keys) + parse_keys(raw_keys_sec)))
+
+    # Order-preserving dedupe (set() would scramble alias order non-deterministically)
+    combined_keys = list(dict.fromkeys(parse_keys(raw_keys) + parse_keys(raw_keys_sec)))
     
     name = entry_dict.get('name') or entry_dict.get('title') or f"Entry_{uid}"
     content = entry_dict.get('content') or entry_dict.get('description') or ''
@@ -137,108 +129,6 @@ def map_sillytavern_entry(uid, entry_dict):
         priority=priority,
         insertion_order=insertion_order
     )
-
-
-def extract_entries_from_json(data):
-    """
-    Extract entries from parsed JSON data regardless of format structure.
-    """
-    if isinstance(data, list):
-        return data
-    if isinstance(data, dict):
-        if "entries" in data:
-            entries_val = data["entries"]
-            if isinstance(entries_val, dict):
-                return list(entries_val.values())
-            if isinstance(entries_val, list):
-                return entries_val
-        if data and all(str(k).isdigit() for k in data.keys()):
-            return list(data.values())
-        
-        # Check values for potential nested entry dictionaries
-        candidate_entries = []
-        for val in data.values():
-            if isinstance(val, dict) and ('key' in val or 'content' in val or 'name' in val):
-                candidate_entries.append(val)
-        if candidate_entries:
-            return candidate_entries
-            
-    return []
-
-
-def build_raw_markdown_in_memory(entry, system_name):
-    """
-    Extracts keys, parses brackets, creates YAML frontmatter,
-    and constructs a raw markdown buffer fully in-memory.
-    """
-    # Check if this is a Narrative entry (Dialogue, Speaker, Scene Description)
-    if 'Speaker' in entry or 'Dialogue' in entry or 'Scene Description' in entry:
-        raw_name = entry.get('Speaker') or 'System-Environment'
-        # Backward-compat: pre-v3.0 vision chunks wrote the underscore form.
-        # Canonical is the space-alias; fall back defensively so legacy data still compiles.
-        scene_desc = entry.get('Scene Description') or entry.get('Scene_Description') or ''
-        dialogue = entry.get('Dialogue') or ''
-        content = f"Dialogue: {dialogue}\n\nScene Description: {scene_desc}"
-        st_keys = [raw_name]
-        
-        # Build YAML dict
-        yaml_dict = {
-            "system": system_name,
-            "tags": [system_name.lower(), "auto-gen", "narrative"],
-            "aliases": st_keys,
-            "type": "Narrative"
-        }
-    else:
-        raw_name = entry.get('name', 'Unnamed')
-        content = entry.get('content', '')
-
-        # 1. Alias Extraction (SillyTavern keys -> Obsidian Aliases)
-        st_keys = entry.get('keys', [])
-        if isinstance(st_keys, str):
-            st_keys = [k.strip() for k in st_keys.split(',')]
-        
-        # 2. Dynamic YAML Foundation
-        yaml_dict = {
-            "system": system_name,
-            "tags": [system_name.lower(), "auto-gen"],
-            "aliases": st_keys
-        }
-
-    # 3. Dynamic Bracket Extraction [Key: Value]
-    metadata_matches = re.findall(r'\[([^\]:]+):\s*([^\]]+)\]', content)
-    for key, value in metadata_matches:
-        clean_key = key.strip().lower().replace(" ", "_")
-        yaml_dict[clean_key] = value.strip()
-        pattern = rf'\[\s*{re.escape(key.strip())}\s*:\s*{re.escape(value.strip())}\s*\]'
-        content = re.sub(pattern, "", content)
-
-    # 4. Build YAML Frontmatter
-    yaml_lines = ["---"]
-    for k, v in yaml_dict.items():
-        if isinstance(v, list):
-            yaml_lines.append(f"{k}: {json.dumps(v)}")
-        else:
-            yaml_lines.append(f"{k}: {v}")
-    yaml_lines.append("---\n")
-    yaml_frontmatter = "\n".join(yaml_lines)
-
-    # 5. Determine subfolder name based on entry type
-    subfolder_name = yaml_dict.get('type', 'General_Rules')
-    if isinstance(subfolder_name, list):
-        subfolder_name = subfolder_name[0] if subfolder_name else 'General_Rules'
-    subfolder_name = str(subfolder_name).title()
-    subfolder_name = re.sub(r'[\\/*?:"<>|]', "-", subfolder_name).strip()
-    if not subfolder_name:
-        subfolder_name = 'General_Rules'
-    
-    # Compile the final raw markdown buffer
-    raw_markdown = yaml_frontmatter + f"# {raw_name}\n\n" + content.strip()
-    
-    safe_title = re.sub(r'[\\/*?:"<>|]', "-", raw_name).strip()
-    if not safe_title:
-        safe_title = "Unnamed"
-        
-    return safe_title, subfolder_name, raw_markdown
 
 
 def atomic_write(content, target_path):
@@ -451,132 +341,164 @@ def process_single_entry(entry, system_name, active_ai, rate_limiter=None, compi
         return False
 
 
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Unified Obsidian Assembly Forge")
-    parser.add_argument("--engine", type=str, choices=["local", "gemini", "featherless"], default=None, help="AI provider engine to use")
-    parser.add_argument("--model", type=str, default=None, help="Model name override")
-    parser.add_argument("--workers", type=int, default=1, help="Number of concurrent worker threads (default: 1)")
-    parser.add_argument("--rate-limit", type=float, default=0.0, help="Delay in seconds between LLM calls per worker (default: 0.0)")
-    args = parser.parse_args()
-    
-    workers = args.workers
-    rate_limit = args.rate_limit
-    
-    active_ai = get_ai_provider(engine_name=args.engine, model_name=args.model)
-    print(f"Ignited Unified Obsidian Vault Compiler using: {active_ai.__class__.__name__} ({active_ai.model_name})...\n")
-    if workers > 1:
-        print(f"Concurrency configured: {workers} worker threads.\n")
-    if rate_limit > 0:
-        print(f"Rate limiting active: {rate_limit}s delay between LLM calls.\n")
-    
-    # 1. Gather JSON Chunks
-    chunk_files = []
-    if OUTPUT_CHUNKS_DIR.exists():
-        for p in OUTPUT_CHUNKS_DIR.rglob("*.json"):
-            if "debug" not in p.parts:
-                chunk_files.append(p)
-                
-    if not chunk_files and os.path.exists("JSON_Lorebooks"):
-        for p in Path("JSON_Lorebooks").rglob("*.json"):
-            chunk_files.append(p)
-            
-    if not chunk_files:
-        print(f"📭 No JSON chunks found to compile. Populate '{OUTPUT_CHUNKS_DIR}' or extraction paths first.")
-        sys.exit(0)
-        
-    print(f"Found {len(chunk_files)} JSON source chunks. Unpacking & compiling directly to Obsidian vault...")
-    
-    # 2. Build Name-to-Title Index for Wiki Link Extraction
+def build_name_to_title_index(chunks):
+    """Build per-system name→title indexes for wiki-link extraction (one-shot)."""
     system_indexes = {}
-    for json_file in chunk_files:
-        json_path_obj = Path(json_file)
-        
-        # Determine system_name
-        try:
-            rel_path = json_path_obj.relative_to(OUTPUT_CHUNKS_DIR)
-            parts = rel_path.parent.parts
-        except ValueError:
-            parts = ()
-            
-        if parts:
-            system_name = parts[0]
-        else:
-            filename = json_path_obj.name
-            if "chunk" in filename.lower():
-                system_name = ACTIVE_SYSTEM
-            else:
-                cleaned_name = filename
-                for part in ["main_", "_world_info", ".json"]:
-                    cleaned_name = cleaned_name.replace(part, "")
-                cleaned_name = cleaned_name.replace("_", " ").strip()
-                system_name = cleaned_name
-                
+    for json_file, system_name in chunks:
         system_indexes.setdefault(system_name, {})
         name_to_title = system_indexes[system_name]
-        
+
         try:
-            with open(json_file, encoding='utf-8') as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
                 entries = extract_entries_from_json(data)
                 for entry in entries:
                     if not isinstance(entry, dict):
                         continue
-                    
-                    raw_name = entry.get('Speaker') or entry.get('name') or entry.get('title')
+
+                    raw_name = entry.get("Speaker") or entry.get("name") or entry.get("title")
                     if not raw_name:
                         continue
-                    
-                    safe_title = re.sub(r'[\\/*?:"<>|]', "-", raw_name).strip()
-                    if not safe_title:
-                        safe_title = "Unnamed"
-                        
+
+                    safe_title = re.sub(r'[\\/*?:"<>|]', "-", raw_name).strip() or "Unnamed"
                     name_to_title[raw_name.lower()] = safe_title
                     name_to_title[safe_title.lower()] = safe_title
-                    
-                    st_keys = entry.get('keys', entry.get('key', []))
+
+                    st_keys = entry.get("keys", entry.get("key", []))
                     if isinstance(st_keys, str):
-                        st_keys = [k.strip() for k in st_keys.split(',') if k.strip()]
+                        st_keys = [k.strip() for k in st_keys.split(",") if k.strip()]
                     elif isinstance(st_keys, list):
                         st_keys = [str(k).strip() for k in st_keys if str(k).strip()]
                     else:
                         st_keys = []
-                        
+
                     for key in st_keys:
                         name_to_title[key.lower()] = safe_title
         except Exception:
             pass
-    
+
+    return system_indexes
+
+
+def build_raw_vault_index():
+    """Build name→title index from the raw vault for compile-phase auto-linking."""
+    name_to_title = {}
+    for raw_path in RAW_VAULT_DIR.rglob("*.md"):
+        safe_title = raw_path.stem
+        name_to_title[safe_title.lower()] = safe_title
+
+        try:
+            content = raw_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+
+        if not content.startswith("---"):
+            continue
+        parts = content.split("---", 2)
+        if len(parts) < 3:
+            continue
+
+        for line in parts[1].splitlines():
+            line = line.strip()
+            if not line.startswith("aliases:"):
+                continue
+            alias_str = line.split(":", 1)[1].strip()
+            try:
+                aliases = json.loads(alias_str)
+            except json.JSONDecodeError:
+                aliases = []
+            for alias in aliases:
+                name_to_title[str(alias).lower()] = safe_title
+
+    return name_to_title
+
+
+def run_raw_phase():
+    """Sweep JSON chunks → raw markdown in RAW_VAULT_DIR. No LLM, ever."""
+    chunks = sweep_chunk_files()
+    if not chunks:
+        print(f"📭 No JSON chunks found. Populate '{OUTPUT_CHUNKS_DIR}' or extraction paths first.")
+        sys.exit(0)
+
+    total = 0
+    for json_file, system_name in chunks:
+        json_path_obj = Path(json_file)
+        try:
+            with open(json_path_obj, encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"  ⚠️ Skipping {json_path_obj.name} - {e}")
+            continue
+
+        entries = extract_entries_from_json(data)
+        if not entries:
+            print(f"  ⚠️ No entries found in chunk file {json_path_obj.name}.")
+            continue
+
+        written = write_raw_vault(entries, system_name, RAW_VAULT_DIR)
+        total += written
+        print(f"  ✅ {written} raw notes from {json_path_obj.name} → {RAW_VAULT_DIR / system_name}")
+
+    print(f"\n🎉 Raw vault assembled: {total} notes in {RAW_VAULT_DIR}. No LLM touched.")
+
+
+def run_compile_phase(active_ai, args):
+    """Compile existing RAW_VAULT_DIR markdown → COMPILED_VAULT_DIR (LLM)."""
+    raw_notes = sorted(RAW_VAULT_DIR.rglob("*.md"))
+    print(f"🔨 Compiling {len(raw_notes)} raw notes from {RAW_VAULT_DIR}...")
+
+    compilation_cache = CompilationCache(BASE_DIR / "cache" / "obsidian_compilation_cache.json")
+    name_to_title = build_raw_vault_index()
     total_compiled = 0
     total_failed = 0
-    
-    for json_file in chunk_files:
-        json_path_obj = Path(json_file)
-        
-        # Determine system_name
-        try:
-            rel_path = json_path_obj.relative_to(OUTPUT_CHUNKS_DIR)
-            parts = rel_path.parent.parts
-        except ValueError:
-            parts = ()
-            
-        if parts:
-            system_name = parts[0]
+
+    for raw_path in raw_notes:
+        rel = raw_path.relative_to(RAW_VAULT_DIR)
+        system_name = rel.parts[0]
+        subfolder = rel.parts[1] if len(rel.parts) > 1 else "General_Rules"
+        safe_title = raw_path.stem
+        raw_content = raw_path.read_text(encoding="utf-8")
+
+        success = compile_and_vault_note(
+            safe_title=safe_title,
+            subfolder_name=subfolder,
+            raw_content=raw_content,
+            system_name=system_name,
+            active_ai=active_ai,
+            compilation_cache=compilation_cache,
+            name_to_title=name_to_title,
+        )
+        if success:
+            total_compiled += 1
         else:
-            filename = json_path_obj.name
-            if "chunk" in filename.lower():
-                system_name = ACTIVE_SYSTEM
-            else:
-                cleaned_name = filename
-                for part in ["main_", "_world_info", ".json"]:
-                    cleaned_name = cleaned_name.replace(part, "")
-                cleaned_name = cleaned_name.replace("_", " ").strip()
-                system_name = cleaned_name
-                
+            total_failed += 1
+
+    print(f"\n🎉 Compile complete. Compiled: {total_compiled}, failed: {total_failed}.")
+
+
+def run_one_shot(active_ai, args):
+    """One-shot: JSON → in-memory raw → compile → COMPILED_VAULT_DIR."""
+    workers = args.workers
+    rate_limit = args.rate_limit
+
+    chunks = sweep_chunk_files()
+    if not chunks:
+        print(f"📭 No JSON chunks found. Populate '{OUTPUT_CHUNKS_DIR}' or extraction paths first.")
+        sys.exit(0)
+
+    print(f"Found {len(chunks)} JSON source chunks. Unpacking & compiling directly to Obsidian vault...")
+
+    system_indexes = build_name_to_title_index(chunks)
+
+    total_compiled = 0
+    total_failed = 0
+
+    for json_file, system_name in chunks:
+        json_path_obj = Path(json_file)
         print(f"\n📂 Processing chunk file: {json_path_obj.name} (RPG System: {system_name})")
-        
+
         try:
-            with open(json_path_obj, encoding='utf-8') as f:
+            with open(json_path_obj, encoding="utf-8") as f:
                 data = json.load(f)
         except json.JSONDecodeError as jde:
             print(f"  ⚠️ Skipping {json_path_obj.name} - Invalid JSON syntax: {jde}")
@@ -596,9 +518,9 @@ def main():
         is_narrative = False
         if raw_entries and isinstance(raw_entries[0], dict):
             first = raw_entries[0]
-            if 'content' in first or 'keys' in first or 'name' in first:
+            if "content" in first or "keys" in first or "name" in first:
                 is_lorebook = True
-            elif 'Dialogue' in first or 'Scene Description' in first or 'Speaker' in first:
+            elif "Dialogue" in first or "Scene Description" in first or "Speaker" in first:
                 is_narrative = True
 
         validated_entries = []
@@ -610,7 +532,7 @@ def main():
                         continue
                     mapped = map_sillytavern_entry(idx, entry_dict)
                     mapped_entries.append(mapped)
-                
+
                 log_payload = LorebookLog(entries=mapped_entries)
                 if hasattr(LorebookLog, "model_validate"):
                     validated_payload = LorebookLog.model_validate(log_payload)
@@ -618,7 +540,7 @@ def main():
                 else:
                     validated_payload = LorebookLog.validate(log_payload)
                     final_json = validated_payload.dict(by_alias=True)
-                validated_entries = final_json.get('entries', [])
+                validated_entries = final_json.get("entries", [])
                 print("  🔍 Validated as LorebookLog (Pydantic schema passed).")
 
             elif is_narrative:
@@ -629,7 +551,7 @@ def main():
                 else:
                     validated_payload = NarrativeLog.validate(log_payload)
                     final_json = validated_payload.dict(by_alias=True)
-                validated_entries = final_json.get('entries', [])
+                validated_entries = final_json.get("entries", [])
                 print("  🔍 Validated as NarrativeLog (Pydantic schema passed).")
 
             else:
@@ -639,13 +561,14 @@ def main():
             print(f"  ❌ Schema validation check failed for {json_path_obj.name}: {exc}")
             total_failed += 1
             continue
-            
+
         name_to_title = system_indexes.get(system_name, {})
         rate_limiter = RateLimiter(rate_limit) if rate_limit > 0 else None
         compilation_cache = CompilationCache(BASE_DIR / "cache" / "obsidian_compilation_cache.json")
-        
+
         if workers > 1:
             from concurrent.futures import ThreadPoolExecutor, as_completed
+
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = {
                     executor.submit(
@@ -662,21 +585,57 @@ def main():
                             total_failed += 1
                     except Exception as exc:
                         entry = futures[future]
-                        name = entry.get('name', entry.get('Speaker', 'Unnamed'))
+                        name = entry.get("name", entry.get("Speaker", "Unnamed"))
                         print(f"  ❌ Entry '{name}' generated an exception: {exc}")
                         total_failed += 1
         else:
             for entry in validated_entries:
-                success = process_single_entry(entry, system_name, active_ai, rate_limiter, compilation_cache, name_to_title)
+                success = process_single_entry(
+                    entry, system_name, active_ai, rate_limiter, compilation_cache, name_to_title
+                )
                 if success:
                     total_compiled += 1
                 else:
                     total_failed += 1
-                
-        # Brief pause between chunks to keep processor cool
+
         time.sleep(1.0)
-        
+
     print(f"\n🎉 Direct Obsidian Assembly Complete. Total successfully compiled: {total_compiled}, failed: {total_failed}.")
+
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Unified Obsidian Assembly Forge")
+    parser.add_argument("--engine", type=str, choices=["local", "gemini", "featherless"], default=None, help="AI provider engine to use")
+    parser.add_argument("--model", type=str, default=None, help="Model name override")
+    parser.add_argument("--workers", type=int, default=1, help="Number of concurrent worker threads (default: 1)")
+    parser.add_argument("--rate-limit", type=float, default=0.0, help="Delay in seconds between LLM calls per worker (default: 0.0)")
+    parser.add_argument("--phase", type=str, choices=["raw", "compile"], default=None,
+                        help="raw: JSON chunks → RAW_VAULT_DIR (no LLM). compile: RAW_VAULT_DIR → COMPILED_VAULT_DIR. Omit for one-shot.")
+    args = parser.parse_args()
+
+    # --phase raw is pure: never construct a provider
+    if args.phase == "raw":
+        run_raw_phase()
+        return
+
+    # --phase compile bails before touching a provider when there's nothing to compile
+    if args.phase == "compile" and not any(RAW_VAULT_DIR.rglob("*.md")):
+        print(f"⚠️ No raw notes found in {RAW_VAULT_DIR}. Run with --phase raw first.")
+        sys.exit(0)
+
+    active_ai = get_ai_provider(engine_name=args.engine, model_name=args.model)
+    print(f"Ignited Unified Obsidian Vault Compiler using: {active_ai.__class__.__name__} ({active_ai.model_name})...\n")
+    if args.workers > 1:
+        print(f"Concurrency configured: {args.workers} worker threads.\n")
+    if args.rate_limit > 0:
+        print(f"Rate limiting active: {args.rate_limit}s delay between LLM calls.\n")
+
+    if args.phase == "compile":
+        run_compile_phase(active_ai, args)
+    else:
+        run_one_shot(active_ai, args)
+
 
 if __name__ == "__main__":
     main()

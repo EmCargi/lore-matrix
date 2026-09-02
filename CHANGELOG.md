@@ -104,7 +104,7 @@ preserved (and where needed, hardened) in V4; see the `[4.0.0]` entry above for 
 
 - ~~Swap `YOUR-USERNAME` in `README.md` badge to the real GitHub handle~~ → **Fixed 2026-09-01** (`EmCargi`).
 
-## [Unreleased] — 2026-09-02
+## [Unreleased] — 2026-09-02 (interactive scrubbing)
 
 ### Added
 
@@ -119,3 +119,26 @@ preserved (and where needed, hardened) in V4; see the `[4.0.0]` entry above for 
 
 - Test suite: **94 passing** (was 91).
 - Full triangulation trail: proposal `2026-09-01-lore-matrix-interactive-scrubbing.md` → counterplan `2026-09-02-lore-matrix-interactive-scrubbing.md` → journal `2026-09-02-lore-matrix-interactive-scrubbing.md`.
+
+## [Unreleased] — 2026-09-02 (exporter consolidation)
+
+### Added
+
+- **`core/raw_vault_builder.py`** (new, pure) — deterministic JSON → raw markdown unwrapper for SillyTavern world-info lorebooks. Imports only stdlib + `config.settings` path constants; zero provider/LLM imports by construction. Handles list/dict/numeric-keyed entries, narrative entries, bracket-metadata extraction, alias flattening, type-routed subfolders.
+- **`json_to_obsidian.py --phase`** — `--phase raw` (JSON → `RAW_VAULT_DIR`, no LLM ever), `--phase compile` (raw vault → compiled vault, empty-vault guard), default one-shot unchanged.
+- **Lazy `ACTIVE_AI`** in `config/settings.py` — module `__getattr__` defers provider construction until read; importing config for path constants no longer wakes up Ollama.
+- **New tests** — `tests/test_raw_vault_builder.py` (5: no-provider-instantiation isolation, SillyTavern unwrap, path sanitization, entry shapes, narrative) + `tests/test_json_to_obsidian.py` (4: raw-no-provider, empty-vault guard, two-phase↔one-shot parity, help).
+
+### Changed
+
+- `map_sillytavern_entry` now falls back to `keys` (lore-matrix schema) alongside `key`/`keysecondary` (raw SillyTavern), and dedupes order-preserving instead of `set()` — fixes aliases being silently dropped in the one-shot path.
+- `core/raw_vault_builder.py` reads settings at call time (single source of truth, testable).
+
+### Removed
+
+- `json-to-md.py` + `md-to-obsidian.py` — orphaned two-phase pipeline fully superseded by `json_to_obsidian.py --phase raw/compile`.
+
+### Notes
+
+- Test suite: **103 passing** (was 94).
+- Triangulation trail: proposal `2026-09-02-lore-matrix-exporter-consolidation.md` → counterplan `2026-09-02-lore-matrix-exporter-consolidation.md` → journal `2026-09-02-lore-matrix-exporter-consolidation.md`.
