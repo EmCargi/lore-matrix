@@ -1,5 +1,6 @@
 # Tests for the extended visualization engine.
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -216,3 +217,81 @@ def test_scatter3d_needs_3_columns():
     )
     assert result.returncode != 0
     csv_path.unlink(missing_ok=True)
+
+
+def test_interactive_headless_fallback(sample_3d_csv):
+    """--chart-type interactive under Agg falls back to GIF export, no crash."""
+    env = dict(os.environ, MPLBACKEND="Agg")
+    result = subprocess.run(
+        [
+            sys.executable, str(SCRIPT_PATH),
+            "--input", str(sample_3d_csv),
+            "--chart-type", "interactive",
+            "--x-col", "label",
+            "--y-col", "x,y,z,sequence",
+            "--output", "test_interactive.gif",
+            "--trail-length", "4",
+            "--fps", "15",
+        ],
+        capture_output=True,
+        cwd=str(PROJECT_ROOT),
+        env=env,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    out = PROJECT_ROOT / "processed_data" / "test_interactive.gif"
+    assert out.exists()
+    out.unlink(missing_ok=True)
+
+
+def test_interactive_headless_no_output_fails(sample_3d_csv):
+    """Interactive without --output must not hang headless — argparse rejects it."""
+    env = dict(os.environ, MPLBACKEND="Agg")
+    result = subprocess.run(
+        [
+            sys.executable, str(SCRIPT_PATH),
+            "--input", str(sample_3d_csv),
+            "--chart-type", "interactive",
+            "--x-col", "label",
+            "--y-col", "x,y,z,sequence",
+        ],
+        capture_output=True,
+        cwd=str(PROJECT_ROOT),
+        env=env,
+    )
+    assert result.returncode != 0
+
+
+def test_interactive_key_stepping(sample_3d_csv):
+    """Arrow-key handler clamps the frame index within [0, frames]."""
+    import argparse
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("visualize_data", SCRIPT_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    df = pd.read_csv(sample_3d_csv)
+    args = argparse.Namespace(
+        trail_length=4, fps=15, title=None, palette=None, output=None, auto_play=False
+    )
+    ctrl = mod._plot_interactive3d(df, "label", ["x", "y", "z", "sequence"], args)
+
+    frames = ctrl["frames"]
+    try:
+        assert frames >= 1
+        for _ in range(frames * 3):
+            ctrl["on_key"](argparse.Namespace(key="right"))
+        assert ctrl["state"]["frame"] == frames
+
+        ctrl["on_key"](argparse.Namespace(key="left"))
+        assert ctrl["state"]["frame"] == frames - 1
+
+        for _ in range(frames * 3):
+            ctrl["on_key"](argparse.Namespace(key="left"))
+        assert ctrl["state"]["frame"] == 0
+
+        ctrl["on_key"](argparse.Namespace(key="up"))
+        assert ctrl["state"]["frame"] == 0
+    finally:
+        mod.plt.close(ctrl["fig"])

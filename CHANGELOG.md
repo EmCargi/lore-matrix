@@ -103,3 +103,19 @@ preserved (and where needed, hardened) in V4; see the `[4.0.0]` entry above for 
 ## Unreleased
 
 - ~~Swap `YOUR-USERNAME` in `README.md` badge to the real GitHub handle~~ → **Fixed 2026-09-01** (`EmCargi`).
+
+## [Unreleased] — 2026-09-02
+
+### Added
+
+- **`--chart-type interactive`** in `core/visualize-data.py` — matplotlib `Slider` + `Button` for manual frame scrubbing, fading trail (`--trail-length`), auto-play toggle (`--fps`, `--auto-play`), and arrow-key stepping. Persistent per-track collections update per-point alpha in place (no per-frame `ax.clear()`). Headless backends (agg/pdf/svg/pgf/cairo) fall back to `animate3d` GIF export; on GUI backends with `--output`, the final scrubbed frame exports on window close.
+- **New tests** — `test_interactive_headless_fallback`, `test_interactive_headless_no_output_fails`, `test_interactive_key_stepping` (key handler clamped to `[0, frames]`).
+
+### Changed
+
+- `--chart-type` choices extended with `interactive`; generic save block now skips self-saving chart types (`animate3d`, `interactive`) — fixes a latent empty-figure double-save for `animate3d`.
+
+### Notes
+
+- Test suite: **94 passing** (was 91).
+- Full triangulation trail: proposal `2026-09-01-lore-matrix-interactive-scrubbing.md` → counterplan `2026-09-02-lore-matrix-interactive-scrubbing.md` → journal `2026-09-02-lore-matrix-interactive-scrubbing.md`.

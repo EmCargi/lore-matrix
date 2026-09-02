@@ -2,7 +2,7 @@
 project: lore-matrix
 date: 2026-09-01
 status: active
-test_count: 91
+test_count: 94
 git: local-only
 extractors: 9 (web, head, ocean, narrative, launchpad, tables, pdf, vision, monsters)
 browser: browser_lore_matrix.py (Streamlit dashboard)
@@ -11,7 +11,7 @@ browser: browser_lore_matrix.py (Streamlit dashboard)
 
 ## Current State (2026-08-15)
 
-Lore Matrix V4 is the **central ETL and visualization hub** of the workspace — the ingestion layer that feeds sibling projects (VSPE, NME, HEAD, Choir Cloud). It ingests unstructured sources (PDFs, web pages, ArchiveBox snapshots, manga OCR, images, RPG game text, TV Tropes), normalizes them through strict Pydantic schemas, and persists to SQLite, ChromaDB, and Obsidian. 91 tests all green, `ruff` clean, CI-gated on GitHub Actions (Python 3.11 / 3.12). A Streamlit browser dashboard (`browser_lore_matrix.py`) replaces the CLI menu for interactive use — ingest, visualize, query databases, and export from the browser.
+Lore Matrix V4 is the **central ETL and visualization hub** of the workspace — the ingestion layer that feeds sibling projects (VSPE, NME, HEAD, Choir Cloud). It ingests unstructured sources (PDFs, web pages, ArchiveBox snapshots, manga OCR, images, RPG game text, TV Tropes), normalizes them through strict Pydantic schemas, and persists to SQLite, ChromaDB, and Obsidian. 94 tests all green, `ruff` clean, CI-gated on GitHub Actions (Python 3.11 / 3.12). A Streamlit browser dashboard (`browser_lore_matrix.py`) replaces the CLI menu for interactive use — ingest, visualize, query databases, and export from the browser.
 
 ## Lineage
 
@@ -30,6 +30,7 @@ Lore Matrix V4 is the **central ETL and visualization hub** of the workspace —
 | 2026-08-15 | `digital-dm-project/shota-monsters-digital-dm/besm/world-lore/pipeline-scope.md` | `2026-08-15-shota-monsters-pipeline-verification.md`, `2026-08-15-master-monster-db-import.md`, `2026-08-15-master-db-catalog-import.md` | **extract-monsters.py** — Weebly monster stat block extractor (103 SxM1 monsters, 0 failures). **monsters-to-md.py** — JSON → Obsidian-ready markdown by stratum. New `MonsterProfile` + `MonsterAbility` Pydantic models + `monster-extractor-prompt.md`. New sibling: digital-dm-project |
 | 2026-08-15 | — | `2026-08-15-archivebox-preservation-layer.md` | **ArchiveBox remote read path** — `extract-web.py` reads the big-rig vault over Tailscale via `dev/core/archivebox.py` (local vault first, remote fallback, `output.html` ladder). `ARCHIVEBOX_URL` added to config |
 | 2026-09-01 | — | — | **browser_lore_matrix.py** — Streamlit browser dashboard (7 tabs: Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). Follows `browser_aeiou.py` / `browser_nme.py` / `browser_choir_cloud.py` pattern. 91 tests, `ruff` clean. Streamlit + plotly added to requirements. |
+| 2026-09-02 | `2026-09-01-lore-matrix-interactive-scrubbing.md` | `2026-09-02-lore-matrix-interactive-scrubbing.md` | **Interactive scrubbing** in `core/visualize-data.py` — new `--chart-type interactive` (matplotlib Slider + Button): manual frame scrub, fading trail, auto-play, arrow-key stepping, headless fallback to GIF. Counterplan `2026-09-02-lore-matrix-interactive-scrubbing.md`. 94 tests. |
 
 ## Architecture Overview
 
@@ -64,7 +65,7 @@ output/json_staging/  ── Hierarchical, category-mirrored staging
     ▼
 Persistence: Obsidian vault · SQLite · ChromaDB
     │
-    └──▶ core/visualize-data.py ── bar/line/box/scatter3d/animate3d/network charts
+    └──▶ core/visualize-data.py ── bar/line/box/scatter3d/animate3d/interactive/network charts
 ```
 
 ## File Map
@@ -98,7 +99,7 @@ Persistence: Obsidian vault · SQLite · ChromaDB
 | `core/utils.py` | Schemas (LorebookLog, NarrativeLog), reasoning-tag stripper, chunker, retry | ~228 | 4 |
 | `core/concurrency.py` | Canonical RateLimiter + make_safe_print (thread-safe) | ~41 | — |
 | `core/image_processing.py` | OCR enhancement (CLAHE, deskew, binarize, bilateral denoise) | ~85 | — |
-| `core/visualize-data.py` | Chart engine (bar/line/box/scatter3d/animate3d/network + MIDI JSON) | ~521 | 8 |
+| `core/visualize-data.py` | Chart engine (bar/line/box/scatter3d/animate3d/interactive/network + MIDI JSON) | ~749 | 11 |
 | `core/narrative_types.py` | NME-compatible Pydantic models (StoryNode, StoryEdge, Perspective, etc.) | ~53 | 4 |
 | `core/ocean_types.py` | OceanProfile Pydantic model (Big Five percentiles) | ~49 | 6 |
 | `core/ocean_scalpel.py` | JSON extraction scalpel (defends against reasoning-model noise) | ~63 | 7 |
@@ -231,7 +232,7 @@ class StoryEdge(BaseModel):
 - Database snapshot & rollback
 - Markdown slicer (monolithic → frontmatter-inheriting cards)
 - Dual-commit (game dialogue → SQLite + ChromaDB)
-- Visualization engine (bar, line, box, scatter3d, animate3d, network + MIDI JSON support)
+- Visualization engine (bar, line, box, scatter3d, animate3d, interactive, network + MIDI JSON support) — interactive adds manual frame scrubbing, fading trail, auto-play, arrow-key stepping
 - Polymorphic gateway router (auto-detects input type)
 - Master CLI menu (15 options)
 - Streamlit browser dashboard (interactive ingest, visualize, query, export)
@@ -240,7 +241,7 @@ class StoryEdge(BaseModel):
 ## What Doesn't Work Yet
 
 - **Vision harvester on thin client** — EasyOCR/opencv not installed (optional layer, ~2GB torch pull). Big rig has them.
-- **No interactive scrubbing in visualizer** — matplotlib slider exists but is basic
+- ~~**No interactive scrubbing in visualizer**~~ — **Fixed 2026-09-02**: `--chart-type interactive` adds matplotlib Slider + Button (manual scrub, trail, auto-play, arrow keys); headless falls back to GIF export.
 - ~~**OCEAN profiler used subprocess**~~ — **Fixed 2026-08-14**: `profile_text()` and `score_text()` extracted to `core/ocean_profiler_engine.py` and `core/launchpad_scorer_engine.py`; vspe-cli imports directly, zero subprocess overhead. Extractors still run standalone.
 - **Launchpad "Levers" excluded from SHDA math** — agent opportunities ≠ institutional stability (by design)
 
@@ -294,6 +295,11 @@ venv/bin/python sql-loader.py --input data.csv --db library.db --table character
 ```bash
 venv/bin/python core/visualize-data.py --input data.csv --chart-type scatter3d --x-col x --y-col y,z --output cloud.png
 venv/bin/python core/visualize-data.py --input midi.json --chart-type animate3d --x-col note_density --y-col active_polyphony,average_velocity --output anim.gif
+
+# Interactive scrubbing (GUI window; --trail-length 8 matches choir_cloud trails)
+venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive --x-col label --y-col x,y,z,sequence --trail-length 8 --fps 15
+# Headless / CI-safe: falls back to GIF export
+venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive --x-col label --y-col x,y,z,sequence --output scrub.gif
 ```
 
 ### Add a new extractor
@@ -333,11 +339,11 @@ venv/bin/python core/visualize-data.py --input midi.json --chart-type animate3d 
 
 ## Next Session Priorities
 
-1. **ChromaDB index for digital-dm** — `build_chromadb.py` exists in digital-dm-project, needs duplicate-ID fix (level-appended ability IDs) and clean run (~3,975 documents, ~30 min via big-rig nomic-embed-text)
-2. **Interactive scrubbing** in `core/visualize-data.py` — matplotlib slider is basic
+1. **ChromaDB index for digital-dm** — `build_chromadb.py` exists in digital-dm-project, needs duplicate-ID fix (level-appended ability IDs) and clean run (~3,975 documents, ~30 min via big-rig nomic-embed-text). *Note: fix + clean run done 2026-09-02 — 5,625 vectors, IDs now species_id-based + effect-hash disambiguated.*
+2. ~~**Interactive scrubbing** in `core/visualize-data.py`~~ — **Shipped 2026-09-02** as `--chart-type interactive` (slider, trail, auto-play, arrow keys). Remaining: live GUI smoke test + Streamlit Plotly port for the Visualizer tab.
 3. **Consolidate `json-to-md.py` and `md-to-obsidian.py`** — overlapping functionality, may merge
 4. **Consider a unified DB schema** — multiple ad-hoc SQLite DBs (cannabis_lab, coursework, game_vault) could share a migration framework
 
 ---
 
-*Handoff updated 2026-09-01. Lore Matrix V4 — the ingestion hub feeding all 6 siblings. extract-head.py ships the cold institution scoring toolchain: foreign governance text → big-rig gemma4-v2 → MesoTierLLM → head-cli fixture YAML. 2026-08-15 additions: extract-monsters.py (103 SxM1 monsters → digital-dm-project) and the ArchiveBox remote read path (big-rig vault over Tailscale). 2026-09-01 addition: browser_lore_matrix.py — Streamlit dashboard with 7 tabs (Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). 91 tests. Gorbachev out-of-sample rerun: ΔF 0.595 → Subversion Catalyst.*
+*Handoff updated 2026-09-02. Lore Matrix V4 — the ingestion hub feeding all 6 siblings. extract-head.py ships the cold institution scoring toolchain: foreign governance text → big-rig gemma4-v2 → MesoTierLLM → head-cli fixture YAML. 2026-08-15 additions: extract-monsters.py (103 SxM1 monsters → digital-dm-project) and the ArchiveBox remote read path (big-rig vault over Tailscale). 2026-09-01 addition: browser_lore_matrix.py — Streamlit dashboard with 7 tabs (Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). 2026-09-02 additions: `--chart-type interactive` scrubbing in the visualizer (slider/trail/auto-play/arrow keys, headless GIF fallback) and the digital-dm ChromaDB rebuild (5,625 vectors, duplicate-ID fix). 94 tests.*

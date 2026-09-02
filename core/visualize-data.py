@@ -25,6 +25,23 @@ try:
 except (ImportError, OSError):
     _MIDI_AVAILABLE = False
 
+# ── interactive-mode helpers ────────────────────────────────────────────────
+
+_NON_INTERACTIVE_BACKENDS = {"agg", "pdf", "svg", "pgf", "cairo"}
+_SELF_SAVING_CHART_TYPES = {"animate3d", "interactive"}
+
+
+def _is_interactive_backend():
+    """True when the active matplotlib backend can open a GUI window.
+
+    Gate on the backend name, not $DISPLAY — macOS/Windows have no DISPLAY
+    yet still run GUIs, and headless Linux can define a dummy display.
+    """
+    import matplotlib
+
+    return matplotlib.get_backend().lower() not in _NON_INTERACTIVE_BACKENDS
+
+
 def load_midi_density(input_path: Path) -> pd.DataFrame:
     """Load MidiDensityLog JSON and flatten to a DataFrame."""
     if not _MIDI_AVAILABLE:
@@ -258,6 +275,197 @@ def _plot_animate3d(df, x_col, y_cols, args):
         plt.close()
 
 
+def _plot_interactive3d(df, x_col, y_cols, args):
+    """Interactive 3D scatter: frame slider, fading trail, auto-play.
+
+    Widgets are garbage-collected if only held in local scope, so they live in
+    `fig._ui_controls` (the canonical documented pattern). Persistent per-track
+    collections update per-point alpha in place; labels and limits are pinned
+    once so scrubbing never redraws the whole plot. Returns a control dict so
+    tests can drive the key handler directly.
+    """
+    from matplotlib.animation import FuncAnimation
+    from matplotlib.widgets import Button, Slider
+
+    if len(y_cols) < 3:
+        print("Error: interactive requires at least 3 Y columns (x, y, z).", file=sys.stderr)
+        sys.exit(1)
+
+    trail = max(0, args.trail_length)
+    fps = max(1, args.fps)
+
+    x_vals = pd.to_numeric(df[x_col], errors="coerce").fillna(0).to_numpy()
+    y_vals = pd.to_numeric(df[y_cols[0]], errors="coerce").fillna(0).to_numpy()
+    z_vals = pd.to_numeric(df[y_cols[1]], errors="coerce").fillna(0).to_numpy()
+    sequence = (
+        pd.to_numeric(df[y_cols[2]], errors="coerce").fillna(0).to_numpy()
+        if len(y_cols) >= 4
+        else None
+    )
+
+    has_measure = "measure" in df.columns
+    has_track = "track_name" in df.columns
+
+    # 1. Frame domain — mirror _plot_animate3d: measure, then sequence, then rows
+    if has_measure:
+        frame_vals = pd.to_numeric(df["measure"], errors="coerce").fillna(0).to_numpy()
+        frames = int(frame_vals.max())
+    elif sequence is not None:
+        frame_vals = sequence
+        frames = int(sequence.max())
+    else:
+        frame_vals = np.arange(len(df))
+        frames = len(df) - 1
+
+    # 2. Own figure/axes — bypass the global plt.figure() in main() so the
+    #    slider/button tray has reserved physical space
+    fig = plt.figure(figsize=(10, 8), dpi=150)
+    fig.subplots_adjust(bottom=0.30)
+    ax = fig.add_subplot(111, projection="3d")
+
+    track_colors = {
+        "Track_01": "#E74C3C", "Track_02": "#3498DB",
+        "Track_03": "#2ECC71", "Track_04": "#9B59B6",
+    }
+    fallback = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+
+    # 3. Persistent scatter collections created ONCE; per-frame updates only
+    #    touch alpha arrays (never ax.clear(), which causes label flicker)
+    collections = []
+    if has_track:
+        for i, track in enumerate(df["track_name"].unique()):
+            mask = (df["track_name"] == track).to_numpy()
+            color = track_colors.get(track, fallback[i % len(fallback)])
+            col = ax.scatter(x_vals[mask], y_vals[mask], z_vals[mask],
+                             c=color, s=80, alpha=1.0, label=track, zorder=3)
+            collections.append((col, mask))
+        ax.legend(loc="upper left", fontsize=8, framealpha=0.7, title="Voices")
+    else:
+        col = ax.scatter(x_vals, y_vals, z_vals,
+                         color="#1f77b4", s=80, alpha=1.0, zorder=3)
+        collections.append((col, None))
+
+    ax.set_xlabel(x_col.replace("_", " ").title(), fontsize=10, labelpad=8)
+    ax.set_ylabel(y_cols[0].replace("_", " ").title(), fontsize=10, labelpad=8)
+    ax.set_zlabel(y_cols[1].replace("_", " ").title(), fontsize=10, labelpad=8)
+
+    def _pad(lo, hi):
+        span = (hi - lo) or 1.0
+        return lo - 0.05 * span, hi + 0.05 * span
+
+    ax.set_xlim(*_pad(x_vals.min(), x_vals.max()))
+    ax.set_ylim(*_pad(y_vals.min(), y_vals.max()))
+    ax.set_zlim(*_pad(z_vals.min(), z_vals.max()))
+
+    base_title = args.title or ("Measure {frame}" if has_measure else "Frame {frame}")
+
+    def set_frame(frame):
+        frame = int(frame)
+        for col, mask in collections:
+            tf = frame_vals if mask is None else frame_vals[mask]
+            d = frame - tf
+            if trail > 0:
+                alpha = np.where(
+                    d < 0, 0.0,
+                    np.where(d == 0, 1.0, np.maximum(0.0, 1.0 - d / trail)),
+                )
+            else:
+                alpha = np.where(d == 0, 1.0, 0.0)
+            col.set_alpha(alpha)
+        ax.set_title(base_title.format(frame=frame), fontsize=13, fontweight="bold", pad=20)
+        fig.canvas.draw_idle()
+
+    # 4. Controls — hard references kept in fig._ui_controls (GC safety)
+    state = {"frame": 0, "playing": False}
+    anim_obj = {"anim": None}
+
+    ax_slider = fig.add_axes([0.18, 0.06, 0.60, 0.03])
+    slider = Slider(ax_slider, "Frame", 0, frames, valinit=0, valstep=1)
+    ax_btn = fig.add_axes([0.80, 0.055, 0.12, 0.045])
+    play_btn = Button(ax_btn, "Play")
+    play_btn.on_clicked(lambda _evt: _toggle_play())
+
+    fig._ui_controls = {"slider": slider, "play": play_btn}
+
+    def _get_anim():
+        if anim_obj["anim"] is None:
+            def next_frame():
+                while True:
+                    yield state["frame"]
+
+            def tick(frame):
+                set_frame(frame)
+                state["frame"] = (frame + 1) % (frames + 1)
+                # suppress on_changed so autoplay ticks don't stop themselves
+                slider.eventson = False
+                slider.set_val(state["frame"])
+                slider.eventson = True
+
+            anim_obj["anim"] = FuncAnimation(
+                fig, tick, frames=next_frame(),
+                interval=max(1, 1000 // fps), blit=False, cache_frame_data=False,
+            )
+            anim_obj["anim"].event_source.stop()
+        return anim_obj["anim"]
+
+    def _stop_playback():
+        state["playing"] = False
+        if anim_obj["anim"] is not None:
+            anim_obj["anim"].event_source.stop()
+        play_btn.label.set_text("Play")
+        fig.canvas.draw_idle()
+
+    def _start_playback():
+        _get_anim()
+        state["frame"] = int(slider.val)
+        anim_obj["anim"].event_source.start()
+        state["playing"] = True
+        play_btn.label.set_text("Pause")
+        fig.canvas.draw_idle()
+
+    def _toggle_play():
+        if state["playing"]:
+            _stop_playback()
+        else:
+            _start_playback()
+
+    # 5. Slider drag pauses playback; resuming reads slider.val as the start
+    def on_slider_change(_val):
+        _stop_playback()
+        state["frame"] = int(slider.val)
+        set_frame(state["frame"])
+
+    slider.on_changed(on_slider_change)
+
+    # 6. Keyboard stepping — boundary-clamped to [0, frames]
+    def on_key(event):
+        if event.key == "left":
+            slider.set_val(max(0, int(slider.val) - 1))
+        elif event.key == "right":
+            slider.set_val(min(frames, int(slider.val) + 1))
+
+    fig.canvas.mpl_connect("key_press_event", on_key)
+
+    # 7. Export final scrubbed frame on window close (--output contract)
+    if args.output:
+        def _save_on_close(_evt):
+            _stop_playback()
+            out_path = BASE_DIR / "processed_data" / Path(args.output).name
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            set_frame(state["frame"])
+            fig.savefig(out_path)
+            print(f"Saved final frame to: {out_path}")
+
+        fig.canvas.mpl_connect("close_event", _save_on_close)
+
+    set_frame(0)
+    if args.auto_play:
+        _toggle_play()
+
+    return {"state": state, "slider": slider, "fig": fig,
+            "on_key": on_key, "frames": frames}
+
+
 def _plot_radar(df, x_col, y_cols, args):
     """Radar/spider chart for multi-axis narrative comparison."""
     if len(y_cols) < 3:
@@ -335,12 +543,18 @@ def main():
     parser.add_argument('--db', help="Path to the target SQLite database file (.db)")
     parser.add_argument('--table', help="Name of the SQLite table to load data from")
     parser.add_argument('--output', required=True, help="Path or name to save the output chart image")
-    parser.add_argument('--chart-type', required=True, choices=['bar', 'line', 'box', 'narrative', 'scatter3d', 'animate3d', 'network', 'radar'], help="Type of chart to generate")
+    parser.add_argument('--chart-type', required=True, choices=['bar', 'line', 'box', 'narrative', 'scatter3d', 'animate3d', 'interactive', 'network', 'radar'], help="Type of chart to generate")
     parser.add_argument('--x-col', help="Column for X-axis (non-interactive mode)")
     parser.add_argument('--y-col', help="Column(s) for Y-axis, comma-separated (non-interactive mode)")
     parser.add_argument('--title', help="Custom chart title")
     parser.add_argument('--figsize', help="Figure size as WxH (default: 10x6)")
     parser.add_argument('--palette', help="Comma-separated hex colors for grouped bars")
+    parser.add_argument('--trail-length', type=int, default=0,
+                        help="Past frames to fade in interactive mode (0 = current frame only)")
+    parser.add_argument('--fps', type=int, default=10,
+                        help="Playback speed for interactive auto-play")
+    parser.add_argument('--auto-play', action='store_true',
+                        help="Start auto-play immediately in interactive mode")
     args = parser.parse_args()
     
     # Load data from database or raw file
@@ -416,6 +630,17 @@ def main():
             _plot_scatter3d(df, x_col, y_cols, args)
         elif args.chart_type == 'animate3d':
             _plot_animate3d(df, x_col, y_cols, args)
+        elif args.chart_type == 'interactive':
+            if _is_interactive_backend():
+                plt.close()  # discard the empty global figure; interactive builds its own
+                _plot_interactive3d(df, x_col, y_cols, args)
+                plt.show()
+            elif args.output:
+                print("⚠️  Non-interactive backend detected — falling back to animate3d GIF export.")
+                _plot_animate3d(df, x_col, y_cols, args)
+            else:
+                print("Error: --chart-type interactive needs an interactive backend or --output.", file=sys.stderr)
+                sys.exit(1)
         elif args.chart_type == 'network':
             _plot_network(df, x_col, y_cols, args)
         elif args.chart_type == 'radar':
@@ -500,22 +725,25 @@ def main():
         print(f"Error generating plot: {e}", file=sys.stderr)
         sys.exit(1)
         
-    # Save the output cleanly into the BASE_DIR / "processed_data" directory
-    output_filename = Path(args.output).name
-    resolved_output = BASE_DIR / "processed_data" / output_filename
-    
-    # Ensure processed_data directory exists
-    resolved_output.parent.mkdir(parents=True, exist_ok=True)
-    
-    plt.tight_layout()
-    try:
-        plt.savefig(resolved_output)
-        print(f"Successfully generated and saved {args.chart_type} plot to: {resolved_output}")
-    except Exception as e:
-        print(f"Error saving plot to {resolved_output}: {e}", file=sys.stderr)
-        sys.exit(1)
-    finally:
-        plt.close()
+    # Save the output cleanly into the BASE_DIR / "processed_data" directory.
+    # animate3d / interactive self-save (GIF export, close-event export) — skip
+    # the generic path so we don't emit a second, empty figure.
+    if args.chart_type not in _SELF_SAVING_CHART_TYPES:
+        output_filename = Path(args.output).name
+        resolved_output = BASE_DIR / "processed_data" / output_filename
+
+        # Ensure processed_data directory exists
+        resolved_output.parent.mkdir(parents=True, exist_ok=True)
+
+        plt.tight_layout()
+        try:
+            plt.savefig(resolved_output)
+            print(f"Successfully generated and saved {args.chart_type} plot to: {resolved_output}")
+        except Exception as e:
+            print(f"Error saving plot to {resolved_output}: {e}", file=sys.stderr)
+            sys.exit(1)
+        finally:
+            plt.close()
 
 if __name__ == '__main__':
     main()
