@@ -118,3 +118,38 @@ def test_narrative_entries(tmp_path):
     content = note.read_text(encoding="utf-8")
     assert "type: Narrative" in content
     assert "Dialogue: Welcome." in content
+
+
+def test_empty_string_alias_filtering(tmp_path):
+    """Empty-string aliases like ['', 'kid', 'child'] must not appear in YAML frontmatter."""
+    from core.raw_vault_builder import write_raw_vault
+
+    entries = [
+        {"name": "Child", "keys": ["", "kid", "child"], "content": "A young one."}
+    ]
+    out = tmp_path / "raw"
+    write_raw_vault(entries, "slang", out)
+
+    note = out / "slang" / "Converted JSON" / "Child.md"
+    assert note.exists()
+    content = note.read_text(encoding="utf-8")
+    assert 'aliases: ["kid", "child"]' in content, f"Empty string should be filtered: {content}"
+    assert 'aliases: [""]' not in content
+
+
+def test_filename_starts_with_dash(tmp_path):
+    """Filenames like '-Cut your stick-' must not start with a dash or dot."""
+    from core.raw_vault_builder import write_raw_vault
+
+    entries = [
+        {"name": "-Cut your stick-", "keys": ["stick"], "content": "A sharp thing."}
+    ]
+    out = tmp_path / "raw"
+    write_raw_vault(entries, "slang", out)
+
+    # File must not start with '-' or '.'
+    note = out / "slang" / "Converted JSON" / "Cut your stick-.md"
+    assert note.exists()
+    # Also verify no file with leading dash exists
+    dash_files = list((out / "slang" / "Converted JSON").glob("-*.md"))
+    assert len(dash_files) == 0, f"Files must not start with dash: {dash_files}"

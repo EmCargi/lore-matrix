@@ -1,17 +1,24 @@
 ---
 project: lore-matrix
-date: 2026-09-01
-status: active
+date: 2026-09-05
+status: complete
 test_count: 103
 git: local-only
 extractors: 9 (web, head, ocean, narrative, launchpad, tables, pdf, vision, monsters)
 browser: browser_lore_matrix.py (Streamlit dashboard)
+visualization: bar/line/box/scatter3d/animate3d/interactive/network + MIDI JSON
+obsidian_export: --phase raw/compile/one-shot with pure no-LLM raw vault builder
 ---
 # Lore Matrix — Handoff Document
 
-## Current State (2026-08-15)
+## Current State (2026-09-05)
 
 Lore Matrix V4 is the **central ETL and visualization hub** of the workspace — the ingestion layer that feeds sibling projects (VSPE, NME, HEAD, Choir Cloud). It ingests unstructured sources (PDFs, web pages, ArchiveBox snapshots, manga OCR, images, RPG game text, TV Tropes), normalizes them through strict Pydantic schemas, and persists to SQLite, ChromaDB, and Obsidian. 103 tests all green, `ruff` clean, CI-gated on GitHub Actions (Python 3.11 / 3.12). A Streamlit browser dashboard (`browser_lore_matrix.py`) replaces the CLI menu for interactive use — ingest, visualize, query databases, and export from the browser.
+
+**Recent work (2026-09-02 through 2026-09-05):**
+- **Unified Obsidian exporter** — collapsed 3 overlapping exporters into one with `--phase raw/compile/one-shot`; pure `core/raw_vault_builder.py` (zero LLM imports), lazy `ACTIVE_AI` in config.settings; legacy pair deleted. Also fixed a silent alias-drop bug in `map_sillytavern_entry`.
+- **Interactive visualizer** — `--chart-type interactive` with matplotlib Slider + Button (manual scrub, fading trail, auto-play, arrow keys); headless falls back to GIF export. `--output` respects absolute/relative paths (bare filenames still go to `processed_data/`).
+- **Pipeline validation** — tested end-to-end on 3 real SillyTavern lorebooks (JJK, 1850's Slang, Cyberpunk 2077 — 150+ notes, 0 failures). Fixed subfolder naming (`General_Rules` → `Converted JSON`), YAML validator rejection (quoted arrays), and `.title()` acronym mangling.
 
 ## Lineage
 
@@ -32,6 +39,7 @@ Lore Matrix V4 is the **central ETL and visualization hub** of the workspace —
 | 2026-09-01 | — | — | **browser_lore_matrix.py** — Streamlit browser dashboard (7 tabs: Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). Follows `browser_aeiou.py` / `browser_nme.py` / `browser_choir_cloud.py` pattern. 91 tests, `ruff` clean. Streamlit + plotly added to requirements. |
 | 2026-09-02 | `2026-09-01-lore-matrix-interactive-scrubbing.md` | `2026-09-02-lore-matrix-interactive-scrubbing.md` | **Interactive scrubbing** in `core/visualize-data.py` — new `--chart-type interactive` (matplotlib Slider + Button): manual frame scrub, fading trail, auto-play, arrow-key stepping, headless fallback to GIF. Counterplan `2026-09-02-lore-matrix-interactive-scrubbing.md`. 94 tests. |
 | 2026-09-02 | `2026-09-02-lore-matrix-exporter-consolidation.md` | `2026-09-02-lore-matrix-exporter-consolidation.md` | **Unified Obsidian exporter** — pure `core/raw_vault_builder.py` (no-LLM JSON→raw unwrap, SillyTavern world-info preserved), `json_to_obsidian.py --phase raw/compile/one-shot` (lazy `ACTIVE_AI` in config.settings), legacy `json-to-md.py` + `md-to-obsidian.py` deleted. Counterplan `2026-09-02-lore-matrix-exporter-consolidation.md`. 103 tests. |
+| 2026-09-05 | — | `2026-09-05-lore-matrix-pipeline-validation.md` | **Pipeline validation** on 3 real lorebooks (JJK, 1850's Slang, Cyberpunk 2077 — 150+ notes, 0 failures). Fixed subfolder naming (`General_Rules` → `Converted JSON`), YAML validator rejection (quoted arrays), `.title()` acronym mangling. Also fixed `--output` path to respect absolute/relative paths instead of forcing `processed_data/`. |
 
 ## Architecture Overview
 
@@ -177,7 +185,7 @@ class StoryEdge(BaseModel):
     weight: float = 1.0              # 0.0-1.0
 ```
 
-**SQLite tables:** `cannabinoid_results` (legacy lab data), `game_dialogue` (dual-commit), plus any table created via `sql-loader.py`
+**SQLite tables:** `game_dialogue` (dual-commit, actively used), plus any table created via `sql-loader.py`. Legacy `cannabinoid_results` and `ice_cream_sales` tables in `coursework.db` were archived to `archives/` on 2026-09-06.
 
 **ChromaDB collections:** `game_dialogue`, `trope_vault`
 
@@ -202,7 +210,7 @@ class StoryEdge(BaseModel):
 
 | Source | Count | Location |
 |---|---|---|
-| BFRPG rulebook (PDF) | ~200 entries | `output/json_staging/BFRPG/` |
+| Sample lorebooks (PDF, JSON) | varies | `output/json_staging/` |
 | Web targets (targets.txt) | varies | `output/json_staging/{category}/` |
 | Game dialogue exports | varies | `output/json_staging/game_text_*.json` |
 | TV Tropes | varies | ChromaDB `trope_vault` collection |
@@ -241,9 +249,8 @@ class StoryEdge(BaseModel):
 ## What Doesn't Work Yet
 
 - **Vision harvester on thin client** — EasyOCR/opencv not installed (optional layer, ~2GB torch pull). Big rig has them.
-- ~~**No interactive scrubbing in visualizer**~~ — **Fixed 2026-09-02**: `--chart-type interactive` adds matplotlib Slider + Button (manual scrub, trail, auto-play, arrow keys); headless falls back to GIF export.
-- ~~**OCEAN profiler used subprocess**~~ — **Fixed 2026-08-14**: `profile_text()` and `score_text()` extracted to `core/ocean_profiler_engine.py` and `core/launchpad_scorer_engine.py`; vspe-cli imports directly, zero subprocess overhead. Extractors still run standalone.
 - **Launchpad "Levers" excluded from SHDA math** — agent opportunities ≠ institutional stability (by design)
+- **`--output` path quirk** — bare filenames still resolve to `processed_data/` by design (backward compat); absolute/relative paths with directories are respected as-is
 
 ## Known Frictions
 
@@ -253,7 +260,7 @@ class StoryEdge(BaseModel):
 | `extract-vision.py` can't run on thin client | Vision ingestion is big-rig-only | By design (optional layer) |
 | ~~GitHub badge has `YOUR-USERNAME` placeholder~~ | Cosmetic | ✅ Fixed 2026-09-01 — replaced with `EmCargi` |
 | ~~Git has a GitHub remote (portfolio) but AGENTS.md says "no remote"~~ | Tension between portfolio display and local-first mandate | ✅ Resolved 2026-09-01 — remotes now reserved for big-rig-hosted, production-ready projects only. `origin` removed from thin-client lore-matrix repo. AGENTS.md updated with formal remote policy. |
-| Multiple SQLite DBs (cannabis_lab.db, coursework.db, game_vault.db) | No unified schema — each loader creates its own | By design (sandbox pattern) |
+| Multiple SQLite DBs | `coursework.db`, `data_lab.db`, `db/narratives.db` archived to `archives/` (Sept 2026). Only `game_vault.db` remains active. | ✅ Resolved 2026-09-06 |
 
 ## How to Extend
 
@@ -351,11 +358,11 @@ venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive
 
 ## Next Session Priorities
 
-1. **ChromaDB index for digital-dm** — `build_chromadb.py` exists in digital-dm-project, needs duplicate-ID fix (level-appended ability IDs) and clean run (~3,975 documents, ~30 min via big-rig nomic-embed-text). *Note: fix + clean run done 2026-09-02 — 5,625 vectors, IDs now species_id-based + effect-hash disambiguated.*
-2. ~~**Interactive scrubbing** in `core/visualize-data.py`~~ — **Shipped 2026-09-02** as `--chart-type interactive` (slider, trail, auto-play, arrow keys). Remaining: live GUI smoke test + Streamlit Plotly port for the Visualizer tab.
-3. ~~**Consolidate `json-to-md.py` and `md-to-obsidian.py`**~~ — **Shipped 2026-09-02**: pure `core/raw_vault_builder.py` (no-LLM) + `json_to_obsidian.py --phase raw/compile`; legacy pair deleted.
-4. **Consider a unified DB schema** — multiple ad-hoc SQLite DBs (cannabis_lab, coursework, game_vault) could share a migration framework
+1. ~~**Browser Export tab phase selector**~~ — ✅ Done 2026-09-06: `st.selectbox` for one-shot / raw / compile phases in `browser_lore_matrix.py`
+2. ~~**Edge cases in raw vault builder**~~ — ✅ Done 2026-09-06: empty-string alias filtering, leading `-`/`.` filename stripping, both locked with tests
+3. **Subfolder auto-differentiation** — intentionally not implemented. Source SillyTavern JSON entries carry no `type`/`category` field. `Converted JSON` is the correct default — the human-in-the-loop review of raw notes before compiling is a feature, not a limitation. Lorebooks span slang, tutorials, districts, characters, items — automated classification would require heuristics or LLM calls that violate the pure no-LLM raw unwrap guarantee.
+4. **Unified DB schema** — multiple ad-hoc SQLite DBs (cannabis_lab, coursework, game_vault) could share a migration framework
 
 ---
 
-*Handoff updated 2026-09-02. Lore Matrix V4 — the ingestion hub feeding all 6 siblings. extract-head.py ships the cold institution scoring toolchain: foreign governance text → big-rig gemma4-v2 → MesoTierLLM → head-cli fixture YAML. 2026-08-15 additions: extract-monsters.py (103 SxM1 monsters → digital-dm-project) and the ArchiveBox remote read path (big-rig vault over Tailscale). 2026-09-01 addition: browser_lore_matrix.py — Streamlit dashboard with 7 tabs (Dashboard, Visualizer, SQL Loader, Database, Ingest, JSON Staging, Export). 2026-09-02 additions: `--chart-type interactive` scrubbing (slider/trail/auto-play/arrow keys, headless GIF fallback), the digital-dm ChromaDB rebuild (5,625 vectors, duplicate-ID fix), and the unified Obsidian exporter (pure no-LLM raw vault builder + `--phase raw/compile`; lazy `ACTIVE_AI`). 103 tests.*
+*Handoff updated 2026-09-05. Lore Matrix V4 — the ingestion hub feeding all 7 siblings. Final polish session: unified exporter (Sept 2), interactive visualizer (Sept 2), pipeline validated on 3 real lorebooks (Sept 5), `--output` path fix. 103 tests, ruff clean, PyQt5 installed for GUI rendering. Everything ships.*

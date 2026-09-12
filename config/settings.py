@@ -52,7 +52,7 @@ def __getattr__(name):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # Pipeline Constraints & Limits
-ACTIVE_SYSTEM = "BFRPG"
+ACTIVE_SYSTEM = "Lore Matrix"
 CHUNK_CHAR_LIMIT = 8000
 OVERLAP_PARAGRAPHS = 1
 MAX_SCRAPE_CHARS = 20000

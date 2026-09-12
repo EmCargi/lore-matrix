@@ -256,8 +256,7 @@ def _plot_animate3d(df, x_col, y_cols, args):
 
     anim = FuncAnimation(fig, update, frames=frames + 1, interval=500, repeat=True)
 
-    output_filename = Path(args.output).name
-    resolved_output = BASE_DIR / "processed_data" / output_filename
+    resolved_output = _resolve_output_path(args.output)
     resolved_output.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -273,6 +272,15 @@ def _plot_animate3d(df, x_col, y_cols, args):
         plt.savefig(resolved_output)
     finally:
         plt.close()
+
+
+def _resolve_output_path(output_arg):
+    """Resolve --output to a Path. Bare filenames stay in processed_data/;
+    paths with a directory component are used as-is."""
+    p = Path(output_arg)
+    if p.parent == Path("."):
+        return BASE_DIR / "processed_data" / p.name
+    return p
 
 
 def _plot_interactive3d(df, x_col, y_cols, args):
@@ -450,7 +458,7 @@ def _plot_interactive3d(df, x_col, y_cols, args):
     if args.output:
         def _save_on_close(_evt):
             _stop_playback()
-            out_path = BASE_DIR / "processed_data" / Path(args.output).name
+            out_path = _resolve_output_path(args.output)
             out_path.parent.mkdir(parents=True, exist_ok=True)
             set_frame(state["frame"])
             fig.savefig(out_path)
@@ -725,14 +733,13 @@ def main():
         print(f"Error generating plot: {e}", file=sys.stderr)
         sys.exit(1)
         
-    # Save the output cleanly into the BASE_DIR / "processed_data" directory.
+    # Save the output to the path specified by --output.
     # animate3d / interactive self-save (GIF export, close-event export) — skip
     # the generic path so we don't emit a second, empty figure.
     if args.chart_type not in _SELF_SAVING_CHART_TYPES:
-        output_filename = Path(args.output).name
-        resolved_output = BASE_DIR / "processed_data" / output_filename
+        resolved_output = _resolve_output_path(args.output)
 
-        # Ensure processed_data directory exists
+        # Ensure the output directory exists
         resolved_output.parent.mkdir(parents=True, exist_ok=True)
 
         plt.tight_layout()

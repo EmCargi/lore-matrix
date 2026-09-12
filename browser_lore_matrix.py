@@ -261,7 +261,7 @@ elif page == "🗄️ SQL Loader":
     st.caption("Generic CSV/XLSX → SQLite with idempotent upsert.")
 
     input_file = st.file_uploader("Upload CSV or XLSX", type=["csv", "xlsx", "xls"], key="sql_upload")
-    db_name = st.text_input("Target SQLite database filename", value="data_lab.db")
+    db_name = st.text_input("Target SQLite database filename", value="game_vault.db")
     table_name = st.text_input("Target table name")
     key_col = st.text_input("Key column (for idempotent upsert)", placeholder="e.g., id")
     if_exists = st.selectbox("If exists", ["replace", "append", "fail"])
@@ -485,16 +485,29 @@ elif page == "📤 Export":
     if export_tool == "JSON → Obsidian Notes (json_to_obsidian.py)":
         st.subheader("Compile JSON → Obsidian Notes")
         st.caption("Converts staged JSON into hash-cached, wiki-linked Obsidian notes.")
+        phase = st.selectbox(
+            "Export phase",
+            ["one-shot", "raw (no-LLM)", "compile"],
+            index=0,
+            help="one-shot: JSON → compiled notes in one pass. raw: JSON → RAW_VAULT_DIR (no LLM). compile: RAW_VAULT_DIR → vault/ (LLM compile).",
+        )
+        cmd_args = [sys.executable, str(BASE_DIR / "src" / "transformers" / "json_to_obsidian.py")]
+        if phase == "raw (no-LLM)":
+            cmd_args.append("--phase")
+            cmd_args.append("raw")
+        elif phase == "compile":
+            cmd_args.append("--phase")
+            cmd_args.append("compile")
         if st.button("▶ Compile to Obsidian", type="primary", use_container_width=True):
             env = os.environ.copy()
             env["PYTHONPATH"] = str(BASE_DIR) + (os.pathsep + env.get("PYTHONPATH", ""))
             try:
                 result = subprocess.run(
-                    [sys.executable, str(BASE_DIR / "src" / "transformers" / "json_to_obsidian.py")],
+                    cmd_args,
                     capture_output=True, text=True, cwd=str(BASE_DIR), env=env, timeout=300
                 )
                 if result.returncode == 0:
-                    st.success("Obsidian compilation complete ✅")
+                    st.success(f"Obsidian compilation complete ({phase}) ✅")
                 else:
                     st.error(f"Failed: {result.stderr[-500:]}")
             except Exception as e:

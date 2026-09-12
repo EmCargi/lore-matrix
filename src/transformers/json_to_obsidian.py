@@ -360,7 +360,7 @@ def build_name_to_title_index(chunks):
                     if not raw_name:
                         continue
 
-                    safe_title = re.sub(r'[\\/*?:"<>|]', "-", raw_name).strip() or "Unnamed"
+                    safe_title = re.sub(r'[\\/*?:"<>|]', "-", raw_name).strip().lstrip("-.").strip() or "Unnamed"
                     name_to_title[raw_name.lower()] = safe_title
                     name_to_title[safe_title.lower()] = safe_title
 
@@ -455,7 +455,7 @@ def run_compile_phase(active_ai, args):
     for raw_path in raw_notes:
         rel = raw_path.relative_to(RAW_VAULT_DIR)
         system_name = rel.parts[0]
-        subfolder = rel.parts[1] if len(rel.parts) > 1 else "General_Rules"
+        subfolder = rel.parts[1] if len(rel.parts) > 1 else "Converted JSON"
         safe_title = raw_path.stem
         raw_content = raw_path.read_text(encoding="utf-8")
 

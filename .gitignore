@@ -25,6 +25,9 @@ processed_images/
 processed_data/
 raw_data/
 
+# --- Archived content (source data, processed artifacts, regenerable outputs) ---
+archives/
+
 # --- Derived / regenerable artifacts ---
 output/
 cache/
@@ -46,9 +49,15 @@ storage/chroma_vault/
 .~lock.*#
 ~lock.*#
 
+# --- Obsidian app state (IDE config, not code) ---
+.obsidian/
+
 # --- Obsidian session state (churns on every open; keep vault config, ignore workspace) ---
 **/.obsidian/workspace.json
 **/.obsidian/workspace-mobile.json
+
+# --- Local config (superseded by config/settings.py) ---
+config.json
 
 # --- Runtime logs (regenerable) ---
 *.log

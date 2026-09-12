@@ -203,7 +203,7 @@ def run_sql_loader_wizard(prefilled_db=None):
         if not user_db:
             user_db = prefilled_db
     else:
-        user_db = input("Enter target SQLite database filename (e.g., data_lab.db): ").strip()
+        user_db = input("Enter target SQLite database filename (e.g., game_vault.db): ").strip()
     user_table = input("Enter destination table name: ").strip()
     
     print("\n🚀 Launching sql_loader.py...")

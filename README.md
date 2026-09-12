@@ -111,6 +111,16 @@ V4 consolidates the suite and makes it GitHub-ready as a portfolio artifact:
 
 > The design history of the loader merge is captured in the repo `CHANGELOG.md`.
 
+### Recent additions (4.1.0)
+
+6. **Unified Obsidian exporter** — 3 overlapping exporters consolidated into one with `--phase raw` / `--phase compile` / one-shot. Pure `core/raw_vault_builder.py` (zero LLM imports), legacy `json-to-md.py` + `md-to-obsidian.py` deleted. Also fixed a silent alias-drop bug in `map_sillytavern_entry`.
+7. **Interactive visualizer** — `--chart-type interactive` adds matplotlib Slider + Button (manual frame scrub, fading trail, auto-play, arrow-key stepping). Headless backends fall back to GIF export. `--output` respects absolute/relative paths (bare filenames resolve to `processed_data/`).
+8. **Pipeline validation** — tested end-to-end on 3 real SillyTavern lorebooks (JJK, 1850's Slang, Cyberpunk 2077 — 150+ notes, 0 failures). Fixed subfolder naming (`General_Rules` → `Converted JSON`), YAML validator rejection (quoted arrays), and `.title()` acronym mangling.
+9. **GUI rendering** — PyQt5 installed for `Qt5Agg` backend support on desktop environments.
+10. **Subfolder differentiation deferred** — source JSON entries carry no `type`/`category` metadata, so `Converted JSON` is the correct default. Human-in-the-loop review of raw notes before compiling is a feature, not a limitation.
+
+> The design history of these additions is captured in the repo `CHANGELOG.md`.
+
 ---
 
 ## 🚀 Installation & Setup
@@ -199,7 +209,7 @@ A uniform factory exposing `generate(system_prompt, user_content, response_forma
 | `core/engines.py` | Provider abstraction (local / gemini / featherless) |
 | `core/utils.py` | Reasoning-tag stripper + `info()/error()` & Pydantic schemas |
 | `core/image_processing.py` | OCR enhancement (CLAHE, deskew, binarize) |
-| `core/visualize-data.py` | Data visualizer engine |
+| `core/visualize-data.py` | Data visualizer engine (bar/line/box/scatter3d/animate3d/interactive/network + MIDI JSON) — interactive adds Slider + Button + trail + arrow-key stepping |
 | `src/scrapers/trope_scraper.py` | TV Tropes harvester |
 | `src/transformers/meta_archivist.py` · `json_to_obsidian.py` | Trope ETL & Obsidian compiler |
 | `src/storage/dual_commit.py` | Game dialogue → SQLite + ChromaDB dual-commit |

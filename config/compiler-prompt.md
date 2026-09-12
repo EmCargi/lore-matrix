@@ -27,11 +27,11 @@ Do not force character headers onto items or locations. Adapt your H3 (`###`) he
 Your output must rigidly follow this exact Markdown structure:
 
 ---
-aliases: [Alias 1, Alias 2]
-tags: [tag1, tag2]
-type: [Character / Faction / Location / Item]
+aliases: ["Alias 1", "Alias 2"]
+tags: ["tag1", "tag2"]
+type: Character
 ---
-# [[Entity Name]]
+# Entity Name
 
 > [!info] Summary
 > [Brief 1-2 sentence summary of who/what they are, applying bracket rules].

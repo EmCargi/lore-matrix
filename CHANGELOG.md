@@ -142,3 +142,26 @@ preserved (and where needed, hardened) in V4; see the `[4.0.0]` entry above for 
 
 - Test suite: **103 passing** (was 94).
 - Triangulation trail: proposal `2026-09-02-lore-matrix-exporter-consolidation.md` → counterplan `2026-09-02-lore-matrix-exporter-consolidation.md` → journal `2026-09-02-lore-matrix-exporter-consolidation.md`.
+
+---
+
+## [4.1.0] — 2026-09-05
+
+### Added
+
+- **Pipeline validation** — tested end-to-end on 3 real SillyTavern lorebooks (JJK, 1850's Slang, Cyberpunk 2077 — 150+ notes, 0 failures). Confirmed raw unwrap, compile, entity linking, callouts, adaptive headers all work correctly.
+- **`--output` path fix** — `--output` now respects absolute/relative paths instead of always forcing `processed_data/`. Bare filenames still resolve to `processed_data/` for backward compatibility.
+
+### Changed
+
+- **Subfolder default** — `General_Rules` → `Converted JSON` in `core/raw_vault_builder.py` and `src/transformers/json_to_obsidian.py`.
+- **Compiler prompt** — YAML arrays now quoted (`aliases: ["Alias 1"]`) to pass frontmatter validation.
+- **`.title()` removed** — acronym mangling (`JSON` → `Json`) fixed in `core/raw_vault_builder.py` and `src/transformers/json_to_obsidian.py`.
+- `--output` path resolution uses `_resolve_output_path()` — bare filenames → `processed_data/`, paths with directories used as-is.
+
+### Notes
+
+- Test suite: **105 passing** (was 103, +2 edge case tests).
+- Triangulation trail: journal `2026-09-05-lore-matrix-pipeline-validation.md`.
+- PyQt5 installed for GUI rendering of `--chart-type interactive`.
+- **Subfolder auto-differentiation** deliberately not implemented. Source SillyTavern JSON carries no `type`/`category` metadata. `Converted JSON` is the correct default — human-in-the-loop review of raw notes before compiling is a feature, not a limitation.

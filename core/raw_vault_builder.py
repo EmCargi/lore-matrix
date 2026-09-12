@@ -84,8 +84,10 @@ def build_raw_markdown_in_memory(entry, system_name):
 
         # 1. Alias extraction (SillyTavern keys -> Obsidian aliases)
         st_keys = entry.get("keys", [])
-        if isinstance(st_keys, str):
-            st_keys = [k.strip() for k in st_keys.split(",")]
+        if isinstance(st_keys, list):
+            st_keys = [k.strip() for k in st_keys if str(k).strip()]
+        elif isinstance(st_keys, str):
+            st_keys = [k.strip() for k in st_keys.split(",") if k.strip()]
 
         # 2. Dynamic YAML foundation
         yaml_dict = {
@@ -113,18 +115,18 @@ def build_raw_markdown_in_memory(entry, system_name):
     yaml_frontmatter = "\n".join(yaml_lines)
 
     # 5. Subfolder routing from entry type
-    subfolder_name = yaml_dict.get("type", "General_Rules")
+    subfolder_name = yaml_dict.get("type", "Converted JSON")
     if isinstance(subfolder_name, list):
-        subfolder_name = subfolder_name[0] if subfolder_name else "General_Rules"
-    subfolder_name = str(subfolder_name).title()
+        subfolder_name = subfolder_name[0] if subfolder_name else "Converted JSON"
+    subfolder_name = str(subfolder_name).strip()
     subfolder_name = re.sub(r'[\\/*?:"<>|]', "-", subfolder_name).strip()
     if not subfolder_name:
-        subfolder_name = "General_Rules"
+        subfolder_name = "Converted JSON"
 
     # 6. Assemble raw markdown buffer
     raw_markdown = yaml_frontmatter + f"# {raw_name}\n\n" + content.strip()
 
-    safe_title = re.sub(r'[\\/*?:"<>|]', "-", raw_name).strip()
+    safe_title = re.sub(r'[\\/*?:"<>|]', "-", raw_name).strip().lstrip("-.").strip()
     if not safe_title:
         safe_title = "Unnamed"
 
