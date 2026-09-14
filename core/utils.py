@@ -238,8 +238,23 @@ def is_retryable_exception(exception):
     before_sleep=log_retry,
     retry=retry_if_exception(is_retryable_exception)
 )
-def generate_with_retry(active_ai, system_prompt, user_prompt, response_format=None):
+def generate_with_retry(active_ai, system_prompt, user_prompt, response_format=None, image_path=None, vision=False):
     """
     Executes raw generate client call with exponential backoff retry policy on network/HTTP failures.
     """
+    if vision:
+        return active_ai.generate_vision(system_prompt, user_prompt, image_path, response_format=response_format)
     return active_ai.generate(system_prompt, user_prompt, response_format=response_format)
+
+
+def slugify(value: str) -> str:
+    """
+    Canonical series slug — NFKD-normalize, non-word → dash, collapse, trim.
+    'Mingyun Comic' -> 'mingyun-comic'. Empty result -> 'unnamed-series'.
+    """
+    import re
+    import unicodedata
+
+    normalized = unicodedata.normalize("NFKD", value)
+    slug = re.sub(r"[^\w]+", "-", normalized.lower(), flags=re.UNICODE)
+    return re.sub(r"-+", "-", slug).strip("-") or "unnamed-series"

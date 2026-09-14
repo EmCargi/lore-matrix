@@ -37,7 +37,7 @@ def is_url(path):
     return path.startswith("http://") or path.startswith("https://")
 
 
-def classify_and_route(input_source, model=None, engine=None):
+def classify_and_route(input_source, model=None, engine=None, direction="LTR"):
     """
     Polymorphically routes a single input source to the appropriate ingestor.
     """
@@ -102,8 +102,7 @@ def classify_and_route(input_source, model=None, engine=None):
             args.extend(["--model", model])
         if engine:
             args.extend(["--engine", engine])
-        # Ask for reading direction (default LTR)
-        args.extend(["--direction", "LTR"])
+        args.extend(["--direction", direction])
         run_sub_ingestor("extract-vision.py", *args)
 
     # 4. Manga OCR Ingestion
@@ -137,7 +136,7 @@ def classify_and_route(input_source, model=None, engine=None):
         print("Please supply a valid URL, .pdf file, image file, Mokuro OCR folder path, or SillyTavern JSON file.")
 
 
-def run_hopper_scan(model=None, engine=None):
+def run_hopper_scan(model=None, engine=None, direction="LTR"):
     """
     Performs a workspace-wide sweep of all default input hoppers and processes them.
     """
@@ -234,8 +233,7 @@ def run_hopper_scan(model=None, engine=None):
             args.extend(["--model", model])
         if engine:
             args.extend(["--engine", engine])
-        # Default direction manga or Western. Let's run LTR or prompt.
-        args.extend(["--direction", "LTR"])
+        args.extend(["--direction", direction])
         run_sub_ingestor("extract-vision.py", *args)
         processed_any = True
 
@@ -261,12 +259,13 @@ def main():
     parser.add_argument("input", nargs="?", default=None, help="Optional direct input source (URL, PDF file path, Image file path, or Manga OCR directory)")
     parser.add_argument("--model", type=str, default=None, help="Target LLM model override")
     parser.add_argument("--engine", type=str, choices=["local", "gemini", "featherless"], default=None, help="AI provider engine to use")
+    parser.add_argument("--direction", type=str, choices=["LTR", "RTL"], default="LTR", help="Reading direction for vision ingestion: LTR (Western Comics) or RTL (Manga)")
     args = parser.parse_args()
 
     if args.input:
-        classify_and_route(args.input, model=args.model, engine=args.engine)
+        classify_and_route(args.input, model=args.model, engine=args.engine, direction=args.direction)
     else:
-        run_hopper_scan(model=args.model, engine=args.engine)
+        run_hopper_scan(model=args.model, engine=args.engine, direction=args.direction)
 
 
 if __name__ == "__main__":

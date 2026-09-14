@@ -2,12 +2,15 @@
 project: lore-matrix
 date: 2026-09-14
 status: complete
-test_count: 103
+test_count: 111
 git: local-only
 extractors: 9 (web, head, ocean, narrative, launchpad, tables, pdf, vision, monsters)
 browser: browser_lore_matrix.py (Streamlit dashboard)
 visualization: bar/line/box/scatter3d/animate3d/interactive/network + MIDI JSON
 obsidian_export: --phase raw/compile/one-shot with pure no-LLM raw vault builder
+json_uploader: streamlit file_uploader for .json / .lorebook.json → input_json/ hopper
+vision: easyocr local + L3-8B-Stheno (big rig) synthesis; --vision-model moondream:latest multimodal option
+manga_db: manga_db_loader.py — per-series SQLite (Chronos disc layout) + Chroma manga_vault (nomic-embed-text) dual-commit; 86 Mingyun entries loaded
 ---
 # Lore Matrix — Handoff Document
 
@@ -43,6 +46,13 @@ Lore Matrix V4 is the **central ETL and visualization hub** of the workspace —
 | 2026-09-02 | `2026-09-02-lore-matrix-exporter-consolidation.md` | `2026-09-02-lore-matrix-exporter-consolidation.md` | **Unified Obsidian exporter** — pure `core/raw_vault_builder.py` (no-LLM JSON→raw unwrap, SillyTavern world-info preserved), `json_to_obsidian.py --phase raw/compile/one-shot` (lazy `ACTIVE_AI` in config.settings), legacy `json-to-md.py` + `md-to-obsidian.py` deleted. Counterplan `2026-09-02-lore-matrix-exporter-consolidation.md`. 103 tests. |
 | 2026-09-05 | — | `2026-09-05-lore-matrix-pipeline-validation.md` | **Pipeline validation** on 3 real lorebooks (JJK, 1850's Slang, Cyberpunk 2077 — 150+ notes, 0 failures). Fixed subfolder naming (`General_Rules` → `Converted JSON`), YAML validator rejection (quoted arrays), `.title()` acronym mangling. Also fixed `--output` path to respect absolute/relative paths instead of forcing `processed_data/`. |
 | 2026-09-11 | — | — | **Repo hygiene** — local data + IDE state untracked (`.obsidian/`, `config.json`, completion/targets lists); `.gitignore` extended. Runtime artifacts stay on the thin client, never ship. (Housekeeping — no proposal) |
+| 2026-09-14 | — | — | **JSON uploader** — added `st.file_uploader` to the Streamlit Ingest tab's Unified Ingestor mode. `.json` / `.lorebook.json` files drop directly into `input_json/` hopper before ingestion. Added `INPUT_JSON_DIR` to `config/settings.py`. |
+| 2026-09-14 | — | — | **PDF uploader** — added `st.file_uploader` for `.pdf` files to the same Unified Ingestor mode. PDFs stage in `input_pdfs/` before extraction via `extract-pdf.py`. Added `INPUT_PDFS_DIR` to the browser app imports. |
+| 2026-09-14 | — | — | **Image uploader** — added `st.file_uploader` for `.png`/`.jpg`/`.jpeg`/`.webp`/`.bmp` to the same Unified Ingestor mode. Images stage in `input_images/` before vision extraction via `extract-vision.py`. Added `INPUT_IMAGES_DIR` to the browser app imports. |
+| 2026-09-14 | — | — | **Vision direction toggle** — `ingest.py` now accepts `--direction LTR/RTL` (threaded through `classify_and_route` + `run_hopper_scan` into `extract-vision.py`). Streamlit Ingest tab added a "Vision reading direction" selectbox that passes it through. LTR default, RTL for manga. |
+| 2026-09-14 | — | — | **Big-rig vision + synthesis wired** — EasyOCR (`easyocr` + `opencv-python-headless`) installed locally for text detection; `LocalProvider` default big-rig synthesis switched to `L3-8B-Stheno` (fast clean structured JSON) via `core/engines.py`. Added `generate_vision()` to `LocalProvider` + `--vision-model` flag to `extract-vision.py` (sends page image to a vision LLM, bypassing EasyOCR; default `moondream:latest`, overridable via `OLLAMA_VISION_MODEL`). Validated end-to-end on the 12-page Mingyun comic: EasyOCR+Stheno = 12/12 clean; moondream direct = reliable to run but degenerate JSON (deferred). |
+| 2026-09-14 | `changelog/proposals/2026-09-14-manga-narrative-db-confirmed.md` | — | **Manga narrative DB shipped** — full triangulation (proposal → counter-plan → synthesis; supersedes the Mokuro-path draft). `extract-vision.py --series <name>` stages chunks under `output/json_staging/<slug>/`; `manga_db_loader.py` validates + persists per-series SQLite (Chronos disc layout `manga-data/<series_id>/data/<series_id>.db`, PK `(series_id, page, entry_index)`, derived `entry_id = page*1000 + entry_index`) and dual-commits a `manga_vault` Chroma collection via `nomic-embed-text` (both LAN nodes). `core/utils.slugify()` canonicalized; `vector_vault.get_collection()` gained an optional embedding_function. 6 new tests → **111 total**. Live load: Mingyun Comic 12 pages / 86 entries / 86 vectors, idempotent re-run. persona-etl handoff ready. |
+| 2026-09-14 | — | — | **Image uploader** — added `st.file_uploader` for `.png`, `.jpg`, `.jpeg`, `.webp`, `.bmp` files. Images stage in `input_images/` before vision extraction via `extract-vision.py`. |
 
 ## Architecture Overview
 
@@ -88,7 +98,8 @@ Persistence: Obsidian vault · SQLite · ChromaDB
 | `ingest.py` | Polymorphic gateway router (auto-detects input type, routes to extractor) | ~273 | — |
 | `extract-pdf.py` | PDF harvester (pdfplumber + LLM → LorebookLog) | ~157 | — |
 | `extract-web.py` | Web/ArchiveBox harvester (BeautifulSoup + Jina fallback + LLM). ArchiveBox path reads local vault first, then the big-rig dashboard over Tailscale via `dev/core/archivebox.py` (output.html fallback) | ~298 | 2 |
-| `extract-vision.py` | Multimodal image harvester (EasyOCR + Union-Find + LLM) | ~475 | — |
+| `extract-vision.py` | Multimodal image harvester (EasyOCR + Union-Find + LLM; `--series` staging + `--vision-model` multimodal option) | ~475 | — |
+| `manga_db_loader.py` | Per-series manga DB loader (NarrativeLog → SQLite Chronos-disc layout + Chroma `manga_vault` dual-commit) | ~200 | 6 |
 | `extract-manga.py` | Manga OCR harvester (Mokuro parser) | ~250 | — |
 | `extract-game-text.py` | Deterministic RPG dialogue parser (no LLM, no AI) | ~219 | 4 |
 | `extract-tables.py` | Strict PDF→CSV table extractor (pdfplumber, no LLM) | ~106 | — |
@@ -224,7 +235,7 @@ class StoryEdge(BaseModel):
 
 - PDF ingestion (pdfplumber + LLM → LorebookLog)
 - Web ingestion (BeautifulSoup + Jina fallback + LLM, ArchiveBox snapshot support)
-- Vision ingestion (EasyOCR + Union-Find clustering + LTR/RTL + image enhancement)
+- Vision ingestion (EasyOCR local + Union-Find clustering + LTR/RTL + image enhancement; big-rig L3-8B-Stheno synthesis)
 - Manga OCR ingestion (Mokuro parser)
 - Game text ingestion (deterministic, no LLM)
 - Strict table extraction (pdfplumber → CSV, no LLM)
@@ -247,11 +258,16 @@ class StoryEdge(BaseModel):
 - Polymorphic gateway router (auto-detects input type)
 - Master CLI menu (15 options)
 - Streamlit browser dashboard (interactive ingest, visualize, query, export)
+- JSON lorebook uploader (Streamlit file_uploader → `input_json/` → `import-json.py`)
+- PDF uploader (Streamlit file_uploader → `input_pdfs/` → `extract-pdf.py`)
+- Image uploader (Streamlit file_uploader → `input_images/` → `extract-vision.py`)
+- Vision reading-direction toggle (LTR/RTL via `ingest.py --direction`, surfaced in the Streamlit Ingest tab)
+- Manga narrative DB (`manga_db_loader.py` — per-series SQLite, PK `(series_id, page, entry_index)`, series_meta provenance, idempotent upsert) + Chroma `manga_vault` dual-commit (nomic-embed-text)
 - Git local-only (9 commits, no remote — `origin` removed 2026-09-01 per the remote policy; portfolio display lives on the big rig)
 
 ## What Doesn't Work Yet
 
-- **Vision harvester on thin client** — EasyOCR/opencv not installed (optional layer, ~2GB torch pull). Big rig has them.
+- **moondream multimodal extraction (deferred)** — `--vision-model moondream:latest` runs reliably on the big rig but yields degenerate `NarrativeLog` JSON (empty placeholders + truncation). The quality path is EasyOCR (local) + L3-8B-Stheno synthesis. Moondream scene-level understanding is a later task.
 - **Launchpad "Levers" excluded from SHDA math** — agent opportunities ≠ institutional stability (by design)
 - **`--output` path quirk** — bare filenames still resolve to `processed_data/` by design (backward compat); absolute/relative paths with directories are respected as-is
 
@@ -260,7 +276,7 @@ class StoryEdge(BaseModel):
 | Friction | Impact | Fix Effort |
 |---|---|---|
 | `requirements.txt` is curated but optional layers commented out | Vision/Gemini deps must be manually uncommented + installed | Low — uncomment + pip install |
-| `extract-vision.py` can't run on thin client | Vision ingestion is big-rig-only | By design (optional layer) |
+| ~~`extract-vision.py` can't run on thin client~~ | Vision ingestion was big-rig-only | ✅ Resolved 2026-09-14 — EasyOCR + opencv installed locally; synthesis on big rig (Stheno) |
 | ~~GitHub badge has `YOUR-USERNAME` placeholder~~ | Cosmetic | ✅ Fixed 2026-09-01 — replaced with `EmCargi` |
 | ~~Git has a GitHub remote (portfolio) but AGENTS.md says "no remote"~~ | Tension between portfolio display and local-first mandate | ✅ Resolved 2026-09-01 — remotes now reserved for big-rig-hosted, production-ready projects only. `origin` removed from thin-client lore-matrix repo. AGENTS.md updated with formal remote policy. |
 | Multiple SQLite DBs | `coursework.db`, `data_lab.db`, `db/narratives.db` archived to `archives/` (Sept 2026). Only `game_vault.db` remains active. | ✅ Resolved 2026-09-06 |
@@ -340,7 +356,7 @@ venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive
 
 ## Operational Notes
 
-- **Big rig (100.73.250.56)** is never touched by tooling. Vision deps (EasyOCR, opencv, google-genai) are installed there by Megane personally.
+- **Big rig (100.73.250.56)** is never touched by tooling. It hosts the synthesis LLM (L3-8B-Stheno) and the optional vision model (moondream); Megane manages big-rig model installs. EasyOCR/opencv now run on the thin client (installed 2026-09-14).
 - **Git** is local-only (9 commits, no remote since 2026-09-01 — remotes are reserved for big-rig-hosted production projects).
 - **venv** is at `/home/megane/dev/venv/` (shared across workspace). Python is 3.12.3.
 - **Ollama fallback chain:** big-rig (`100.73.250.56:11434`, primary) → thin-client (`localhost:11434`, fallback). Big-rig hosts `gemma4-v2-Q6_K.gguf` + `qwen2.5-coder:14b`. Override primary model via `OLLAMA_PRIMARY_MODEL` env; fallback model via extractor `--model`. Chain is in `core/ollama.py` (canonical copy).

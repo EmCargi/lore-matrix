@@ -43,8 +43,8 @@ pytest==9.1.1
 # ============================================================
 
 # --- Vision ingestion (extract-vision.py) ---
-# easyocr
-# opencv-python-headless
+easyocr
+opencv-python-headless
 
 # --- Cloud provider (core/engines.py GeminiProvider) ---
 # google-genai

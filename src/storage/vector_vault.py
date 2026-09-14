@@ -30,16 +30,18 @@ def get_chroma_client():
         client = chromadb.PersistentClient(path=db_path)
     return client
 
-def get_collection(name="narrative_tropes"):
+def get_collection(name="narrative_tropes", embedding_function=None):
     client = get_chroma_client()
-    # Utilizing Chroma's default local ONNX MiniLM embedding function
-    # It executes fully locally on the host machine.
-    ef = embedding_functions.DefaultEmbeddingFunction()
+    # Default: Chroma's local ONNX MiniLM (fully local on this host).
+    # Callers may pass an OllamaEmbeddingFunction (e.g. nomic-embed-text via
+    # the workspace fallback chain) for series/settings vector stores.
+    if embedding_function is None:
+        embedding_function = embedding_functions.DefaultEmbeddingFunction()
     
     with open(os.devnull, "w") as f, contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
         collection = client.get_or_create_collection(
             name=name,
-            embedding_function=ef
+            embedding_function=embedding_function
         )
     return collection
 

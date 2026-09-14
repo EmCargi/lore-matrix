@@ -23,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from config.settings import ACTIVE_SYSTEM, OUTPUT_CHUNKS_DIR
+from config.settings import ACTIVE_SYSTEM, OUTPUT_CHUNKS_DIR, INPUT_JSON_DIR, INPUT_PDFS_DIR, INPUT_IMAGES_DIR
 
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR.parent))  # dev/ — shared core (ollama)
@@ -346,6 +346,66 @@ elif page == "📥 Ingest":
     if ingest_mode == "Unified Ingestor":
         st.subheader("Run Unified Ingestor")
         st.caption("Scans all input hoppers (PDFs, web targets, images, manga OCR, JSON) and routes each to its extractor.")
+
+        json_uploaded = st.file_uploader(
+            "📦 Upload JSON Lorebook",
+            type=["json", "lorebook.json"],
+            accept_multiple_files=True,
+            key="json_upload",
+            help="Drop SillyTavern .json or .lorebook.json files here. They'll be staged in input_json/ before ingestion.",
+        )
+        if json_uploaded:
+            INPUT_JSON_DIR.mkdir(parents=True, exist_ok=True)
+            saved_files = []
+            for uploaded_file in json_uploaded:
+                dest = INPUT_JSON_DIR / uploaded_file.name
+                with open(dest, "wb") as f:
+                    f.write(uploaded_file.getvalue())
+                saved_files.append(uploaded_file.name)
+            st.success(f"📦 {len(saved_files)} file(s) staged to `input_json/`: {', '.join(saved_files)}")
+
+        pdf_uploaded = st.file_uploader(
+            "📄 Upload PDF",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key="pdf_upload",
+            help="Drop PDF files here. They'll be staged in input_pdfs/ before extraction.",
+        )
+        if pdf_uploaded:
+            INPUT_PDFS_DIR.mkdir(parents=True, exist_ok=True)
+            pdf_saved = []
+            for uploaded_file in pdf_uploaded:
+                dest = INPUT_PDFS_DIR / uploaded_file.name
+                with open(dest, "wb") as f:
+                    f.write(uploaded_file.getvalue())
+                pdf_saved.append(uploaded_file.name)
+            st.success(f"📄 {len(pdf_saved)} file(s) staged to `input_pdfs/`: {', '.join(pdf_saved)}")
+
+        image_uploaded = st.file_uploader(
+            "🖼️ Upload Image(s)",
+            type=["png", "jpg", "jpeg", "webp", "bmp"],
+            accept_multiple_files=True,
+            key="image_upload",
+            help="Drop image files here. They'll be staged in input_images/ before vision extraction.",
+        )
+        if image_uploaded:
+            INPUT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+            image_saved = []
+            for uploaded_file in image_uploaded:
+                dest = INPUT_IMAGES_DIR / uploaded_file.name
+                with open(dest, "wb") as f:
+                    f.write(uploaded_file.getvalue())
+                image_saved.append(uploaded_file.name)
+            st.success(f"🖼️ {len(image_saved)} file(s) staged to `input_images/`: {', '.join(image_saved)}")
+
+        vision_direction = st.selectbox(
+            "Vision reading direction",
+            ["LTR", "RTL"],
+            index=0,
+            key="vision_direction",
+            help="LTR for Western comics, RTL for manga. Applied to the image hopper when the unified ingestor runs extract-vision.py.",
+        )
+
         model = st.text_input("Model override (optional)", placeholder="e.g., gemma4-v2-Q6_K.gguf:latest")
         engine = st.selectbox("Engine", ["local", "gemini", "featherless"])
 
@@ -355,6 +415,8 @@ elif page == "📥 Ingest":
                 cmd.extend(["--model", model])
             if engine != "local":
                 cmd.extend(["--engine", engine])
+            if vision_direction != "LTR":
+                cmd.extend(["--direction", vision_direction])
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(BASE_DIR), timeout=300)
                 st.code(result.stdout[-1000:] if result.stdout else result.stderr[-1000:])

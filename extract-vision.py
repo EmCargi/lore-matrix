@@ -25,7 +25,7 @@ from config.settings import (
     PROCESSED_IMAGES_DIR,
     VISION_EXTRACTOR_SYSTEM_PROMPT,
 )
-from core.utils import NarrativeLog, clean_reasoning_response, generate_with_retry
+from core.utils import NarrativeLog, clean_reasoning_response, generate_with_retry, slugify
 
 
 def group_and_sort_bounding_boxes(results, img_width, img_height, direction='LTR'):
@@ -163,113 +163,137 @@ def group_and_sort_bounding_boxes(results, img_width, img_height, direction='LTR
     return grouped_segments
 
 
-def run_vision_pipeline(image_path, reader, direction='LTR', context=None, active_ai=None, preprocess=False, binarize=False, deskew=False, debug_ocr=False):
+def run_vision_pipeline(image_path, reader, direction='LTR', context=None, active_ai=None, preprocess=False, binarize=False, deskew=False, debug_ocr=False, vision_model=None, series_slug=None):
     if active_ai is None:
         active_ai = ACTIVE_AI
-        
+
     print(f"\n🚀 Initiating Multimodal Vision Harvesting for: {image_path.name}")
     print(f"  -> Selected direction: {direction}")
     if context:
         print(f"  -> Context: {context}")
-    
+
     # 1. Load image and determine dimensions
     img = cv2.imread(str(image_path))
     if img is None:
         print(f"❌ Error: Unable to read image file '{image_path}'")
         return False
-        
+
     h, w = img.shape[:2]
     print(f"  -> Dimensions: {w}x{h}")
-    
-    # 2. Run Image Preprocessing if requested
-    ocr_img = img
-    if preprocess or binarize or deskew:
-        print("  -> Applying image enhancement filters for OCR...")
-        from core.image_processing import preprocess_image_for_ocr
-        ocr_img = preprocess_image_for_ocr(
-            img,
-            binarize=binarize,
-            denoise=preprocess,
-            contrast=preprocess,
-            deskew=deskew
+
+    # 0. Vision-model path (multimodal): send the page image directly to a
+    # vision-capable LLM (e.g. big-rig minicpm-v:8b), bypassing EasyOCR. The
+    # model reads the whole page — panels, characters, scene layout — so the
+    # NarrativeLog is grounded in the image, not just OCR text.
+    if vision_model:
+        print(f"  -> Multimodal vision model: {vision_model}")
+        raw_ocr_text = (
+            "Read this manga/comic page image and generate the corresponding "
+            "narrative logs matching the schema. Capture dialogue, speakers, "
+            "and scene/action context from the panels in chronological reading order."
         )
-        h, w = ocr_img.shape[:2]
-    
-    # 3. Run EasyOCR detection & recognition
-    print("  -> Scanning image for text segments...")
-    results = reader.readtext(ocr_img)
-    print(f"  -> EasyOCR detected {len(results)} raw bounding boxes.")
-    
-    # 3. Cluster boxes into readable dialogues
-    grouped_segments = group_and_sort_bounding_boxes(results, w, h, direction=direction)
-    if not grouped_segments:
-        print("  ⚠️ No valid text segments remained after noise/margin filtering.")
-        return False
-        
-    dialogues = [g['text'] for g in grouped_segments]
-    
-    print(f"  -> Clustered bounding boxes into {len(dialogues)} cohesive dialogue blocks:")
-    for idx, text in enumerate(dialogues, 1):
-        print(f"     [{idx}] {text}")
-        
-    # Draw OCR Debug Visualizations if requested
-    if debug_ocr:
-        debug_img = img.copy()
-        for idx, g in enumerate(grouped_segments, 1):
-            # Draw green bounding box rectangle
-            cv2.rectangle(
-                debug_img,
-                (int(g['x_min']), int(g['y_min'])),
-                (int(g['x_max']), int(g['y_max'])),
-                (0, 255, 0),
-                2
-            )
-            # Draw label box
-            label = f"[{idx}]"
-            (w_label, h_label), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-            # Ensure background box doesn't go out of bounds at the top
-            label_y = int(g['y_min'])
-            cv2.rectangle(
-                debug_img,
-                (int(g['x_min']), label_y - h_label - 10 if label_y - h_label - 10 > 0 else 0),
-                (int(g['x_min']) + w_label, label_y),
-                (0, 255, 0),
-                cv2.FILLED
-            )
-            # Draw index text
-            cv2.putText(
-                debug_img,
-                label,
-                (int(g['x_min']), label_y - 5 if label_y - 5 > 0 else 5),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0, 0, 0),
-                2
-            )
-        debug_dir = OUTPUT_CHUNKS_DIR / "debug"
-        debug_dir.mkdir(parents=True, exist_ok=True)
-        debug_path = debug_dir / f"debug_{image_path.name}"
-        cv2.imwrite(str(debug_path), debug_img)
-        print(f"  🐞 Saved OCR debug visualization to: {debug_path}")
-        
-    # 4. format raw dialogues for LLM ingestion
-    dialogue_input_str = "\n".join(f"{idx}. {text}" for idx, text in enumerate(dialogues, 1))
-    
-    raw_ocr_text = (
-        f"Parse the following vision-derived text blocks chronologically according to the rules. "
-        f"Generate the corresponding narrative logs matching the schema.\n\n"
-        f"Parsed Image Texts:\n{dialogue_input_str}"
-    )
-    
-    if context:
-        user_prompt = f"[SCENE CONTEXT]: {context}\n\n[RAW OCR TEXT]:\n{raw_ocr_text}"
+        if context:
+            user_prompt = f"[SCENE CONTEXT]: {context}\n\n{raw_ocr_text}"
+        else:
+            user_prompt = raw_ocr_text
     else:
-        user_prompt = raw_ocr_text
+        # 2. Run Image Preprocessing if requested
+        ocr_img = img
+        if preprocess or binarize or deskew:
+            print("  -> Applying image enhancement filters for OCR...")
+            from core.image_processing import preprocess_image_for_ocr
+            ocr_img = preprocess_image_for_ocr(
+                img,
+                binarize=binarize,
+                denoise=preprocess,
+                contrast=preprocess,
+                deskew=deskew
+            )
+            h, w = ocr_img.shape[:2]
+
+        # 3. Run EasyOCR detection & recognition
+        print("  -> Scanning image for text segments...")
+        results = reader.readtext(ocr_img)
+        print(f"  -> EasyOCR detected {len(results)} raw bounding boxes.")
+
+        # 3. Cluster boxes into readable dialogues
+        grouped_segments = group_and_sort_bounding_boxes(results, w, h, direction=direction)
+        if not grouped_segments:
+            print("  ⚠️ No valid text segments remained after noise/margin filtering.")
+            return False
+
+        dialogues = [g['text'] for g in grouped_segments]
+
+        print(f"  -> Clustered bounding boxes into {len(dialogues)} cohesive dialogue blocks:")
+        for idx, text in enumerate(dialogues, 1):
+            print(f"     [{idx}] {text}")
+
+        # Draw OCR Debug Visualizations if requested
+        if debug_ocr:
+            debug_img = img.copy()
+            for idx, g in enumerate(grouped_segments, 1):
+                # Draw green bounding box rectangle
+                cv2.rectangle(
+                    debug_img,
+                    (int(g['x_min']), int(g['y_min'])),
+                    (int(g['x_max']), int(g['y_max'])),
+                    (0, 255, 0),
+                    2
+                )
+                # Draw label box
+                label = f"[{idx}]"
+                (w_label, h_label), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                # Ensure background box doesn't go out of bounds at the top
+                label_y = int(g['y_min'])
+                cv2.rectangle(
+                    debug_img,
+                    (int(g['x_min']), label_y - h_label - 10 if label_y - h_label - 10 > 0 else 0),
+                    (int(g['x_min']) + w_label, label_y),
+                    (0, 255, 0),
+                    cv2.FILLED
+                )
+                # Draw index text
+                cv2.putText(
+                    debug_img,
+                    label,
+                    (int(g['x_min']), label_y - 5 if label_y - 5 > 0 else 5),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 0, 0),
+                    2
+                )
+            debug_dir = OUTPUT_CHUNKS_DIR / "debug"
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            debug_path = debug_dir / f"debug_{image_path.name}"
+            cv2.imwrite(str(debug_path), debug_img)
+            print(f"  🐞 Saved OCR debug visualization to: {debug_path}")
+
+        # 4. format raw dialogues for LLM ingestion
+        dialogue_input_str = "\n".join(f"{idx}. {text}" for idx, text in enumerate(dialogues, 1))
+
+        raw_ocr_text = (
+            f"Parse the following vision-derived text blocks chronologically according to the rules. "
+            f"Generate the corresponding narrative logs matching the schema.\n\n"
+            f"Parsed Image Texts:\n{dialogue_input_str}"
+        )
+
+        if context:
+            user_prompt = f"[SCENE CONTEXT]: {context}\n\n[RAW OCR TEXT]:\n{raw_ocr_text}"
+        else:
+            user_prompt = raw_ocr_text
     
     # 5. Invoke AI endpoint via active_ai
-    print(f"  -> Contacting LLM endpoint ({active_ai.model_name})...")
+    # 5. Invoke AI endpoint via active_ai
     try:
-        raw_response = generate_with_retry(active_ai, VISION_EXTRACTOR_SYSTEM_PROMPT, user_prompt, response_format=NarrativeLog)
+        if vision_model:
+            print(f"  -> Contacting vision model ({vision_model})...")
+            raw_response = generate_with_retry(
+                active_ai, VISION_EXTRACTOR_SYSTEM_PROMPT, user_prompt,
+                response_format=NarrativeLog, image_path=image_path, vision=True
+            )
+        else:
+            print(f"  -> Contacting LLM endpoint ({active_ai.model_name})...")
+            raw_response = generate_with_retry(active_ai, VISION_EXTRACTOR_SYSTEM_PROMPT, user_prompt, response_format=NarrativeLog)
         
         # Strip reasoning tags (deepseek-r1) and any code fences, then validate
         raw_response = clean_reasoning_response(raw_response)
@@ -293,6 +317,8 @@ def run_vision_pipeline(image_path, reader, direction='LTR', context=None, activ
             
         rel_dir = rel_path.parent
         target_out_dir = OUTPUT_CHUNKS_DIR / rel_dir
+        if series_slug:
+            target_out_dir = target_out_dir / series_slug
         target_out_dir.mkdir(parents=True, exist_ok=True)
         
         safe_path = target_out_dir / f"vision_chunk_{image_path.stem}.json"
@@ -323,6 +349,8 @@ def run_vision_pipeline(image_path, reader, direction='LTR', context=None, activ
             rel_path = Path(image_path.name)
         rel_dir = rel_path.parent
         target_out_dir = OUTPUT_CHUNKS_DIR / rel_dir
+        if series_slug:
+            target_out_dir = target_out_dir / series_slug
         target_out_dir.mkdir(parents=True, exist_ok=True)
         error_path = target_out_dir / f"vision_chunk_{image_path.stem}_ERROR.txt"
         with open(error_path, 'w', encoding='utf-8') as f:
@@ -340,7 +368,7 @@ from core.concurrency import RateLimiter, make_safe_print
 print = make_safe_print()
 
 
-def process_single_image(img_path, reader, direction, context, active_ai, preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter=None):
+def process_single_image(img_path, reader, direction, context, active_ai, preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter=None, vision_model=None, series_slug=None):
     """
     Worker function to process a single image and archive it upon completion.
     """
@@ -355,7 +383,9 @@ def process_single_image(img_path, reader, direction, context, active_ai, prepro
         preprocess=preprocess,
         binarize=binarize,
         deskew=deskew,
-        debug_ocr=debug_ocr
+        debug_ocr=debug_ocr,
+        vision_model=vision_model,
+        series_slug=series_slug
     )
     
     if success:
@@ -384,6 +414,8 @@ def main():
     parser.add_argument("--context", type=str, default=None, help="Scene context to guide LLM extraction and prevent hallucinations")
     parser.add_argument("--engine", type=str, choices=["local", "gemini", "featherless"], default=None, help="AI provider engine to use")
     parser.add_argument("--model", type=str, default=None, help="Model name override")
+    parser.add_argument("--vision-model", type=str, default=None, help="Multimodal vision model (e.g. minicpm-v:8b). Sends the page image directly to the model, bypassing EasyOCR.")
+    parser.add_argument("--series", type=str, default=None, help="Series/comic name. When set, output stages under output/json_staging/<series-slug>/ (e.g. 'Mingyun Comic' -> 'mingyun-comic').")
     parser.add_argument("--preprocess", action="store_true", help="Enable image pre-processing (denoising and contrast enhancement) for OCR")
     parser.add_argument("--binarize", action="store_true", help="Apply adaptive thresholding/binarization to image")
     parser.add_argument("--deskew", action="store_true", help="Automatically detect and correct image skew/rotation")
@@ -399,6 +431,10 @@ def main():
     debug_ocr = args.debug_ocr
     workers = args.workers
     rate_limit = args.rate_limit
+    vision_model = args.vision_model
+    series_slug = slugify(args.series) if args.series else None
+    if series_slug:
+        print(f"📚 Series staging: output/json_staging/{series_slug}/\n")
     
     from config.settings import get_ai_provider
     active_ai = get_ai_provider(engine_name=args.engine, model_name=args.model)
@@ -444,7 +480,7 @@ def main():
                 executor.submit(
                     process_single_image,
                     img_path, reader, direction, context, active_ai,
-                    preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter
+                    preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter, vision_model, series_slug
                 ): img_path for img_path in target_images
             }
             for future in as_completed(futures):
@@ -463,7 +499,7 @@ def main():
             print("="*50)
             success = process_single_image(
                 img_path, reader, direction, context, active_ai,
-                preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter
+                preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter, vision_model, series_slug
             )
             if success:
                 success_count += 1

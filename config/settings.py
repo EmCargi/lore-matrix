@@ -69,6 +69,8 @@ COMPILED_VAULT_DIR = BASE_DIR / "vault"
 ARCHIVEBOX_VAULT_DIR = Path(os.environ.get("ARCHIVEBOX_VAULT_DIR", BASE_DIR / "archivebox"))
 ARCHIVEBOX_URL = os.environ.get("ARCHIVEBOX_URL", "http://100.73.250.56:8040")
 INPUT_GAME_TEXT_DIR = BASE_DIR / "input_game_text"
+INPUT_JSON_DIR = BASE_DIR / "input_json"
+MANGA_DATA_DIR = BASE_DIR / "manga-data"
 
 # Load system prompts dynamically from config markdown files
 def load_prompt(filename):
