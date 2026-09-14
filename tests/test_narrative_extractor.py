@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -18,7 +19,6 @@ from core.narrative_types import (
     StoryEdge,
     StoryNode,
 )
-
 
 # ── Fixtures ──────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ def test_story_edge_valid(sample_edge):
 
 def test_story_edge_weight_rejected():
     """Pydantic rejects weight > 1.0 rather than clamping."""
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         StoryEdge(source="a", target="b", weight=1.5)
 
 
@@ -126,7 +126,7 @@ def test_narrative_structure_serializes(sample_structure):
 
 
 def test_narrative_structure_rejects_bad_edge():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         NarrativeStructure(
             name="Bad",
             edges=[StoryEdge(source="a", target="b", weight=5.0)],

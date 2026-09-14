@@ -4,15 +4,12 @@ import os
 import sqlite3
 import sys
 
-import pytest
-
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 loader = importlib.import_module("manga_db_loader")
 
-from config.settings import OUTPUT_CHUNKS_DIR  # noqa: E402
 
 
 def _write_chunk(series_dir, page, entries):
@@ -108,7 +105,8 @@ def test_invalid_chunk_skipped_not_fatal(tmp_path, monkeypatch):
 def test_series_isolation(tmp_path, monkeypatch):
     """Two series land in separate DB files, no cross-contamination."""
     monkeypatch.setattr(loader, "MANGA_DATA_DIR", tmp_path)
-    a = tmp_path / "a"; b = tmp_path / "b"
+    a = tmp_path / "a"
+    b = tmp_path / "b"
     _write_chunk(a, 1, [_entry("A")])
     _write_chunk(b, 1, [_entry("B")])
     loader.load_series("a", "A", input_dir=a, embed=False)

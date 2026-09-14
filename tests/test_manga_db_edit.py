@@ -1,9 +1,7 @@
 import json
+import os
 import sqlite3
 import sys
-import os
-
-import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -11,7 +9,6 @@ if PROJECT_ROOT not in sys.path:
 
 import manga_db_edit
 import manga_db_loader
-from config.settings import OUTPUT_CHUNKS_DIR
 
 
 def _seed_series(tmp_path, monkeypatch, series="s"):

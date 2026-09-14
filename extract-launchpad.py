@@ -39,7 +39,7 @@ def cmd_score(args) -> None:
 
     features = score_text(text, system_prompt, provider)
 
-    print(f"\n  Institutional Features:")
+    print("\n  Institutional Features:")
     print(f"  Faults ({len(features.faults)}): {', '.join(features.faults[:3])}{'...' if len(features.faults) > 3 else ''}")
     print(f"  Levers ({len(features.levers)}): {', '.join(features.levers[:3])}{'...' if len(features.levers) > 3 else ''}")
     print(f"  Scarcities ({len(features.scarcities)}): {', '.join(features.scarcities[:3])}{'...' if len(features.scarcities) > 3 else ''}")
@@ -60,7 +60,7 @@ def cmd_scan(args) -> None:
     """List available prompt files."""
     config_dir = BASE_DIR / "config"
     prompts = sorted(config_dir.glob("*-prompt.md"))
-    print(f"\n  Available prompts:\n")
+    print("\n  Available prompts:\n")
     for p in prompts:
         print(f"    {p.name}")
 

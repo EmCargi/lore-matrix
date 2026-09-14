@@ -23,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from config.settings import ACTIVE_SYSTEM, OUTPUT_CHUNKS_DIR, INPUT_JSON_DIR, INPUT_PDFS_DIR, INPUT_IMAGES_DIR
+from config.settings import ACTIVE_SYSTEM, INPUT_IMAGES_DIR, INPUT_JSON_DIR, INPUT_PDFS_DIR, OUTPUT_CHUNKS_DIR
 
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR.parent))  # dev/ — shared core (ollama)

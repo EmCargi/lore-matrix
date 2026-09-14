@@ -1,5 +1,4 @@
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -7,7 +6,6 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
-from mpl_toolkits.mplot3d import Axes3D
 
 # Import BASE_DIR from config.settings (or define fallback if import fails)
 try:
@@ -527,7 +525,7 @@ def _plot_network(df, x_col, y_cols, args):
     if len(y_cols) >= 2:
         sources = df[y_cols[0]].astype(str).tolist()
         targets = df[y_cols[1]].astype(str).tolist()
-        for s, t in zip(sources, targets):
+        for s, t in zip(sources, targets, strict=False):
             if s != t:
                 G.add_edge(s, t)
 

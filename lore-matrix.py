@@ -319,7 +319,7 @@ def run_narrative_extractor_wizard():
     if emit_nme:
         cmd_args.extend(["--emit-to-nme", emit_nme])
 
-    print(f"\n🚀 Launching extract-narrative.py...")
+    print("\n🚀 Launching extract-narrative.py...")
     run_script("extract-narrative.py", *cmd_args)
 
 

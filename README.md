@@ -9,7 +9,7 @@
 
 Lore Matrix is a data-engineering portfolio suite: it ingests unstructured sources — PDFs, web pages/ArchiveBox snapshots, RPG text exports, Manga OCR timelines, and images — normalizes them through strict Pydantic schemas, and persists them as relational rows (SQLite), vector embeddings (ChromaDB), and single-note repositories (Obsidian). It is built for **resilience (idempotent, schema-validated, retry-hardened), portability (provider-agnostic LLM adapter, path-agnostic resolution), and decoupling (central config, externalized prompts)**.
 
-> **📌 Project status — complete.** V4 shipped, validated end-to-end on 3 real lorebooks (150+ notes, 0 failures), polished (unified exporter, interactive visualizer, repo hygiene 2026-09-11). 103 tests green, `ruff` clean. Only foreseeable work is new extractors or prompt variants on demand. Details: [HANDOFF-lore-matrix.md](HANDOFF-lore-matrix.md).
+> **📌 Project status — complete.** V4 shipped, validated end-to-end on 3 real lorebooks (150+ notes, 0 failures), polished (unified exporter, interactive visualizer, repo hygiene 2026-09-11). Since then: **manga narrative pipeline** (2026-09-14) — EasyOCR + big-rig Stheno synthesis, per-series SQLite + Chroma `manga_vault` dual-commit, a durable HITL correction layer, and an OCR transcript review vault. **117 tests green**, `ruff` clean. Details: [HANDOFF-lore-matrix.md](HANDOFF-lore-matrix.md).
 
 ### ⚡ At a Glance
 
@@ -17,7 +17,7 @@ Lore Matrix is a data-engineering portfolio suite: it ingests unstructured sourc
 | :--- | :--- |
 | **Ingest** | PDF · web / ArchiveBox · Manga OCR · images · RPG game text · TV Tropes |
 | **Validation** | Strict Pydantic v2 schemas · reasoning-tag & code-fence cleaning |
-| **Persist** | SQLite (relational) · ChromaDB (vector) · Obsidian (notes) |
+| **Persist** | SQLite (relational + per-series manga discs) · ChromaDB (vector) · Obsidian (notes) |
 | **Resilience** | Idempotent writes · tenacity retries · provider-agnostic LLM adapter · deterministic parsers |
 | **Quality** | `ruff` lint + `pytest` suite gated in CI (Python 3.11 / 3.12) |
 
@@ -123,6 +123,26 @@ V4 consolidates the suite and makes it GitHub-ready as a portfolio artifact:
 
 > The design history of these additions is captured in the repo `CHANGELOG.md`.
 
+### Recent additions (4.2.0)
+
+11. **Manga narrative pipeline** — comic pages → `extract-vision.py --series <name>`
+    (EasyOCR local + big-rig L3-8B-Stheno synthesis) → per-series SQLite disc
+    (`manga-data/<series_id>/data/<series_id>.db`, PK `(series_id, page,
+    entry_index)`) + Chroma `manga_vault` dual-commit (nomic-embed-text) via
+    `manga_db_loader.py`. Consumed downstream by the persona-etl card factory
+    (`manga:<series_id>[:<speaker>]` intake).
+12. **HITL correction layer** — `manga_db_edit.py` (list/edit/delete/apply/
+    corrections): durable `corrections` overrides (NULL = leave untouched) +
+    tombstone deletes, auto-applied after every load and re-synced to Chroma —
+    the human fix point before OCR noise propagates to downstream cards.
+13. **OCR transcript review vault** — `--ocr-vault --ocr-only` writes the raw
+    EasyOCR transcript per page (`output/json_staging/ocr_transcript/…`), a
+    no-LLM "inspect raw, then compile" review surface for humans.
+14. **Browser uploaders** — Streamlit Ingest tab gains JSON / PDF / image
+    uploaders + a vision reading-direction toggle (LTR/RTL).
+
+> The design history of these additions is captured in the repo `CHANGELOG.md`.
+
 ---
 
 ## 🚀 Installation & Setup
@@ -137,9 +157,9 @@ python -m pytest
 ```
 
 ### External Dependencies
-- **Ollama** — local reasoning models (`deepseek-r1:7b`, `qwen2.5-coder`), the default `local` provider.
-- **EasyOCR** — vision engine for the multimodal harvester.
-- **ChromaDB** — vector store for trope-RAG and dual-commit subsystems.
+- **Ollama** — local reasoning models (`deepseek-r1:7b`, `qwen2.5-coder`), the default `local` provider. Big-rig L3-8B-Stheno recommended for narrative synthesis.
+- **EasyOCR** — vision engine for the multimodal harvester (installed on the thin client).
+- **ChromaDB** — vector store for trope-RAG, dual-commit, and the `manga_vault` collection (embeddings via `nomic-embed-text` on Ollama).
 
 ### Configuration (`config/settings.py`)
 Everything central lives in one place — engines, prompt paths, and the pipeline's directory layout. Key settings:
@@ -203,6 +223,7 @@ A uniform factory exposing `generate(system_prompt, user_content, response_forma
 | `data-profile.py` | Dataset health audit / sanitization gate |
 | `db-migrate.py` | SQLite snapshot & rollback manager |
 | `json-to-lorebook.py` · `import-json.py` | SillyTavern lorebook compilers & importers |
+| `manga_db_loader.py` · `manga_db_edit.py` | Per-series manga narrative DB (SQLite + Chroma dual-commit) · HITL correction CLI |
 | `src/transformers/json_to_obsidian.py` | Unified Obsidian exporter — `--phase raw` (no-LLM JSON→raw), `--phase compile` (raw→compiled), or one-shot |
 
 ### `core/`, `src/`
@@ -249,6 +270,7 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) runs **ruff lint** and **
 | Sweep all hoppers | [ingest.py](ingest.py) (auto-detects input type, routes to extractor) |
 | One extractor standalone | [extract-pdf.py](extract-pdf.py) / [extract-web.py](extract-web.py) / [extract-game-text.py](extract-game-text.py) / [extract-narrative.py](extract-narrative.py) / [extract-ocean.py](extract-ocean.py) / [extract-head.py](extract-head.py) |
 | Browser dashboard | `streamlit run` [browser_lore_matrix.py](browser_lore_matrix.py) |
+| Manga: extract → load → correct | [extract-vision.py](extract-vision.py) `--series <name>` → [manga_db_loader.py](manga_db_loader.py) → [manga_db_edit.py](manga_db_edit.py) `list/edit/apply` |
 | JSON → Obsidian | [src/transformers/json_to_obsidian.py](src/transformers/json_to_obsidian.py) `--phase raw` (no-LLM) / `compile` / one-shot |
 | Visualize | [core/visualize-data.py](core/visualize-data.py) (bar/line/box/scatter3d/animate3d/interactive/network + MIDI JSON) |
 | Load CSV → SQLite | [sql-loader.py](sql-loader.py) (idempotent upsert) |

@@ -3,8 +3,8 @@ import os
 # =====================================================================
 # THE AI PROVIDER MODULES (The Decoupled LLM Adapters)
 # =====================================================================
-
 from core.ollama import default_chain, post_json
+
 
 class GeminiProvider:
     def __init__(self, model_name="gemini-2.5-flash-preview-09-2025"):

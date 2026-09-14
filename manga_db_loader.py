@@ -20,7 +20,7 @@ import json
 import re
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Path agnosticism bootstrap
@@ -91,7 +91,9 @@ def chroma_id(series_id: str, page: int, entry_index: int) -> str:
 def _open_chroma():
     """Open the manga_vault collection (nomic-embed-text via Ollama)."""
     import os
+
     from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+
     from src.storage.vector_vault import get_collection
 
     ef = OllamaEmbeddingFunction(
@@ -111,7 +113,7 @@ def apply_corrections(series_id: str, db_path: Path | None = None, embed: bool =
     Returns {"updated", "deleted"}.
     """
     db_path = db_path or resolve_db_path(series_id)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     if not db_path.exists():
         return {"updated": 0, "deleted": 0}
 
@@ -208,7 +210,7 @@ def load_series(series_id: str, display_name: str, artist: str = "",
                 input_dir: Path | None = None, embed: bool = True) -> dict:
     """Validate every chunk, upsert narrative rows, refresh series_meta, and
     best-effort dual-commit to the manga_vault Chroma collection."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     chunks = _iter_chunks(series_id, input_dir)
     if not chunks:
         print(f"📭 No vision_chunk_*.json found for `{series_id}`. Nothing loaded.")

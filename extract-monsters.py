@@ -2,11 +2,11 @@ import json
 import os
 import random
 import re
+import sys
 import time
 
 from pydantic import ValidationError
 
-import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config.settings import (

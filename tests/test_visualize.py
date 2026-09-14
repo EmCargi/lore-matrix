@@ -5,7 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -200,7 +199,6 @@ def test_missing_column_error(sample_narrative_csv):
 
 def test_scatter3d_needs_3_columns():
     """scatter3d requires at least 3 Y columns."""
-    import io
     csv_path = Path("/tmp/test_2col.csv")
     csv_path.write_text("label,x,y\nA,1,2\nB,3,4\n", encoding="utf-8")
     result = subprocess.run(

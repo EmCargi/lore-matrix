@@ -3,7 +3,6 @@
 Stratum is derived from the target list, not the LLM output."""
 
 import json
-import os
 import re
 from pathlib import Path
 

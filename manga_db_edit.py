@@ -24,7 +24,7 @@ Run (from lore-matrix/):
 import argparse
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Path agnosticism bootstrap
@@ -34,7 +34,9 @@ if str(BASE_DIR) not in sys.path:
 
 from manga_db_loader import _init_db, apply_corrections, resolve_db_path  # noqa: E402
 
-_now = lambda: datetime.now(timezone.utc).isoformat()
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 def _conn(db_path: Path):
@@ -59,9 +61,11 @@ def cmd_list(args) -> int:
            WHERE n.series_id = ?"""
     params: list = [args.series]
     if args.page is not None:
-        q += " AND n.page = ?"; params.append(args.page)
+        q += " AND n.page = ?"
+        params.append(args.page)
     if args.speaker:
-        q += " AND n.speaker = ? COLLATE NOCASE"; params.append(args.speaker)
+        q += " AND n.speaker = ? COLLATE NOCASE"
+        params.append(args.speaker)
     if args.grep:
         q += " AND (n.dialogue LIKE ? OR n.scene_description LIKE ? OR n.speaker LIKE ?)"
         like = f"%{args.grep}%"

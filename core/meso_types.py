@@ -13,6 +13,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+
 class ScheinAudit(BaseModel):
     """Organizational culture in Schein's three concentric layers."""
     artifacts: str = Field(..., description="Visible customs, iconography, rituals, material culture")

@@ -39,14 +39,14 @@ def convert_jsonl_to_prose(input_path: Path, output_path: Path, include_user: bo
     try:
         metadata = json.loads(lines[0])
     except json.JSONDecodeError:
-        raise ValueError(f"First line is not valid JSON metadata: {lines[0][:100]}")
+        raise ValueError(f"First line is not valid JSON metadata: {lines[0][:100]}") from None
 
     character_name = metadata.get("character_name", "Character")
     user_name = metadata.get("user_name", "User")
 
     # 2. Parse messages
     messages = []
-    for i, line in enumerate(lines[1:], 2):
+    for _i, line in enumerate(lines[1:], 2):
         line = line.strip()
         if not line:
             continue
@@ -122,7 +122,7 @@ def main():
     stats = convert_jsonl_to_prose(input_path, out_path, include_user=not args.character_only)
 
     print(f"\n{'=' * 55}")
-    print(f"  Conversion complete")
+    print("  Conversion complete")
     print(f"{'=' * 55}")
     print(f"  Messages parsed: {stats['total_messages']}")
     print(f"  Character msgs: {stats['character_messages']}")

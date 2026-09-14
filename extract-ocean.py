@@ -39,7 +39,7 @@ def cmd_profile(args) -> None:
 
     profile = profile_text(text, system_prompt, provider)
 
-    print(f"\n  OCEAN Profile:")
+    print("\n  OCEAN Profile:")
     print(f"  Openness:          {profile.Openness:.0f}")
     print(f"  Conscientiousness: {profile.Conscientiousness:.0f}")
     print(f"  Extraversion:      {profile.Extraversion:.0f}")
@@ -61,7 +61,7 @@ def cmd_scan(args) -> None:
     """List available prompt files."""
     config_dir = BASE_DIR / "config"
     prompts = sorted(config_dir.glob("*-prompt.md"))
-    print(f"\n  Available prompts:\n")
+    print("\n  Available prompts:\n")
     for p in prompts:
         print(f"    {p.name}")
 

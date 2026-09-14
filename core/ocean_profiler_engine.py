@@ -1,8 +1,8 @@
 """core/ocean_profiler_engine.py — Pure OCEAN profiling function, importable by both
 the extract-ocean CLI and vspe-cli's ocean_profiler wrapper. No argparse, no CLI glue."""
 
-from core.ocean_types import OceanProfile
 from core.ocean_scalpel import extract_json_scalpel
+from core.ocean_types import OceanProfile
 from core.utils import clean_reasoning_response, generate_with_retry
 
 

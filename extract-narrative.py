@@ -118,7 +118,6 @@ def _resolve_pov_from_nodes(nodes: list[dict], raw_perspectives: list[dict]) -> 
     if not pov_counts:
         return _dedup_perspectives(raw_perspectives)
 
-    sorted_povs = sorted(pov_counts.items(), key=lambda x: x[1], reverse=True)
     total_tagged = sum(pov_counts.values())
 
     name_to_norm: dict[str, str] = {}
@@ -292,7 +291,7 @@ def main():
         print(f"❌ Input file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"🚀 Narrative Structure Extractor")
+    print("🚀 Narrative Structure Extractor")
     print(f"📂 Input: {input_path}")
     text = input_path.read_text(encoding="utf-8-sig")
 
@@ -311,7 +310,7 @@ def main():
         sys.exit(1)
 
     # 4. Extract structure
-    print(f"🔍 Extracting narrative structure...")
+    print("🔍 Extracting narrative structure...")
     result = extract_structure(text, system_prompt, provider, chunk_limit=args.chunk_limit)
 
     # 5. Write output to staging
@@ -338,7 +337,7 @@ def main():
 
     # 7. Confirmation ledger
     print(f"\n{'=' * 55}")
-    print(f"  ✅ Narrative structure extracted")
+    print("  ✅ Narrative structure extracted")
     print(f"{'=' * 55}")
     print(f"  Name: {result.name}")
     print(f"  Nodes: {len(result.nodes)}")
@@ -351,7 +350,7 @@ def main():
     if nme_path:
         print(f"  NME vault: {nme_path}")
     else:
-        print(f"\n  Copy to NME narrative vault and run: nme.py db build")
+        print("\n  Copy to NME narrative vault and run: nme.py db build")
 
 
 if __name__ == "__main__":

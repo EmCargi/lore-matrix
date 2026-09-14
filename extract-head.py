@@ -23,11 +23,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import yaml
+
 from config.settings import BASE_DIR, get_ai_provider, load_prompt
 from core.meso_types import MesoTierLLM, ScheinOnly
 from core.ocean_scalpel import extract_json_scalpel
 from core.utils import clean_reasoning_response, generate_with_retry
-
 
 MESO_PROMPT_FILENAME = "meso-profiler-prompt.md"
 
@@ -107,7 +107,7 @@ def cmd_profile(args) -> None:
     provider = get_ai_provider(engine_name=args.engine, model_name=args.model)
     system_prompt = load_prompt(MESO_PROMPT_FILENAME)
     if not system_prompt:
-        print(f"[FATAL] Could not load meso-profiler-prompt from config/")
+        print("[FATAL] Could not load meso-profiler-prompt from config/")
         sys.exit(1)
 
     out_stem = args.out or Path(args.input).stem
@@ -128,7 +128,7 @@ def cmd_profile(args) -> None:
             print("[FATAL] Existing fixture missing institutional_index — cannot attach Schein audit")
             sys.exit(1)
 
-        print(f"  Mode: Schein-only audit (sliders preserved)")
+        print("  Mode: Schein-only audit (sliders preserved)")
         scored = score_institution(text, system_prompt, provider, schein_only=True)
         if scored.Schein is None:
             print("\n  [ERROR] Schein-only pass returned no Schein block.")
@@ -146,7 +146,7 @@ def cmd_profile(args) -> None:
             atomic_write_yaml(out_path, existing)
             print(f"  Updated: {out_path}")
         else:
-            print(f"  Skipped — fixture exists. Use --overwrite to replace.")
+            print("  Skipped — fixture exists. Use --overwrite to replace.")
         return
 
     scored = score_institution(text, system_prompt, provider, schein_only=False)
@@ -161,9 +161,9 @@ def cmd_profile(args) -> None:
         atomic_write_yaml(out_path, fixture)
         print(f"  Saved: {out_path}")
     else:
-        print(f"  Skipped — fixture exists. Use --overwrite to replace (previous archived to .bak).")
+        print("  Skipped — fixture exists. Use --overwrite to replace (previous archived to .bak).")
 
-    print(f"\n  Meso Sliders:")
+    print("\n  Meso Sliders:")
     idx = fixture["institutional_index"]
     print(f"    BRC: {idx['behavior_regulation']:.1f}")
     print(f"    IRT: {idx['information_routing']:.1f}")
@@ -171,13 +171,13 @@ def cmd_profile(args) -> None:
     print(f"    SRI: {idx['somatic_insulation']:.1f}")
     print(f"    Quadrant: {fixture['head_quadrant']}")
     if fixture.get("schein_levels"):
-        print(f"    Schein: 3-layer cultural audit attached")
+        print("    Schein: 3-layer cultural audit attached")
 
 
 def cmd_scan(args) -> None:
     config_dir = BASE_DIR / "config"
     prompts = sorted(config_dir.glob("*-prompt.md"))
-    print(f"\n  Available profiler prompts:\n")
+    print("\n  Available profiler prompts:\n")
     for p in prompts:
         marker = " ← meso" if MESO_PROMPT_FILENAME in p.name else ""
         print(f"    {p.name}{marker}")
