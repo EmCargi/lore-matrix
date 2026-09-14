@@ -3,7 +3,7 @@ project: lore-matrix
 date: 2026-09-14
 status: complete
 test_count: 111
-git: local-only
+git: portfolio-remote (EmCargi/lore-matrix)
 extractors: 9 (web, head, ocean, narrative, launchpad, tables, pdf, vision, monsters)
 browser: browser_lore_matrix.py (Streamlit dashboard)
 visualization: bar/line/box/scatter3d/animate3d/interactive/network + MIDI JSON
@@ -268,7 +268,7 @@ class StoryEdge(BaseModel):
 - Vision reading-direction toggle (LTR/RTL via `ingest.py --direction`, surfaced in the Streamlit Ingest tab)
 - Manga narrative DB (`manga_db_loader.py` — per-series SQLite, PK `(series_id, page, entry_index)`, series_meta provenance, idempotent upsert) + Chroma `manga_vault` dual-commit (nomic-embed-text); **consumed by persona-etl via `manga:<series_id>[:<speaker>]` intake (2026-09-14)**
 - Correction layer (`manga_db_edit.py` — durable `corrections` overrides, NULL-meaning fields, tombstone deletes, auto-applied on every load, Chroma re-sync)
-- Git local-only (9 commits, no remote — `origin` removed 2026-09-01 per the remote policy; portfolio display lives on the big rig)
+- Git: portfolio remote `origin` → `EmCargi/lore-matrix` (pushed to `main`, includes the 4.2.0 manga pipeline). Engine code only; IP/data/generated artifacts stay gitignored.
 
 ## What Doesn't Work Yet
 
@@ -283,7 +283,7 @@ class StoryEdge(BaseModel):
 | `requirements.txt` is curated but optional layers commented out | Vision/Gemini deps must be manually uncommented + installed | Low — uncomment + pip install |
 | ~~`extract-vision.py` can't run on thin client~~ | Vision ingestion was big-rig-only | ✅ Resolved 2026-09-14 — EasyOCR + opencv installed locally; synthesis on big rig (Stheno) |
 | ~~GitHub badge has `YOUR-USERNAME` placeholder~~ | Cosmetic | ✅ Fixed 2026-09-01 — replaced with `EmCargi` |
-| ~~Git has a GitHub remote (portfolio) but AGENTS.md says "no remote"~~ | Tension between portfolio display and local-first mandate | ✅ Resolved 2026-09-01 — remotes now reserved for big-rig-hosted, production-ready projects only. `origin` removed from thin-client lore-matrix repo. AGENTS.md updated with formal remote policy. |
+| ~~Git has a GitHub remote (portfolio) but AGENTS.md says "no remote"~~ | Tension between portfolio display and local-first mandate | ✅ Resolved — lore-matrix is the portfolio repo and pushes to `EmCargi/lore-matrix` (2026-09-14); AGENTS.md remote policy governs which repos get remotes |
 | Multiple SQLite DBs | `coursework.db`, `data_lab.db`, `db/narratives.db` archived to `archives/` (Sept 2026). Only `game_vault.db` remains active. | ✅ Resolved 2026-09-06 |
 
 ## How to Extend
@@ -362,7 +362,7 @@ venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive
 ## Operational Notes
 
 - **Big rig (100.73.250.56)** is never touched by tooling. It hosts the synthesis LLM (L3-8B-Stheno) and the optional vision model (moondream); Megane manages big-rig model installs. EasyOCR/opencv now run on the thin client (installed 2026-09-14).
-- **Git** is local-only (9 commits, no remote since 2026-09-01 — remotes are reserved for big-rig-hosted production projects).
+- **Git** is the portfolio save-state — `origin` → `EmCargi/lore-matrix`, pushed to `main` (re-activated for portfolio pushes; IP/data/generated artifacts stay gitignored).
 - **venv** is at `/home/megane/dev/venv/` (shared across workspace). Python is 3.12.3.
 - **Ollama fallback chain:** big-rig (`100.73.250.56:11434`, primary) → thin-client (`localhost:11434`, fallback). Big-rig hosts `gemma4-v2-Q6_K.gguf` + `qwen2.5-coder:14b`. Override primary model via `OLLAMA_PRIMARY_MODEL` env; fallback model via extractor `--model`. Chain is in `core/ollama.py` (canonical copy).
 - **CI**: `.github/workflows/ci.yml` runs `ruff check .` + `pytest` on Python 3.11 / 3.12.
