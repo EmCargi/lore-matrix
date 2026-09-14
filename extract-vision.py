@@ -1,6 +1,9 @@
 import json
+import os
+import re
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 # Try to import cv2 and easyocr
@@ -163,7 +166,45 @@ def group_and_sort_bounding_boxes(results, img_width, img_height, direction='LTR
     return grouped_segments
 
 
-def run_vision_pipeline(image_path, reader, direction='LTR', context=None, active_ai=None, preprocess=False, binarize=False, deskew=False, debug_ocr=False, vision_model=None, series_slug=None):
+def _write_ocr_transcript(image_path, series_slug, dialogues):
+    """Write the raw EasyOCR transcript for one page as an Obsidian-ready note.
+
+    Pure no-LLM diagnostic dump (the raw-vault philosophy): lets a human review
+    exactly what EasyOCR read (e.g. `CIT4` for `city`) before it reaches a card.
+    """
+    stem = image_path.stem
+    m = re.search(r"(\d+)", stem)
+    page_int = int(m.group(1)) if m else 0
+    page_label = m.group(1).zfill(2) if m else stem
+
+    trans_dir = OUTPUT_CHUNKS_DIR / "ocr_transcript" / (series_slug or "unfiled")
+    trans_dir.mkdir(parents=True, exist_ok=True)
+    out_path = trans_dir / f"page_{page_label}.md"
+
+    lines = [
+        "---",
+        f"series: {series_slug or ''}",
+        f"page: {page_int}",
+        f"source_file: {image_path.name}",
+        "tags:",
+        "  - manga",
+        "  - ocr-transcript",
+        "---",
+        f"# Page {page_label} — OCR Transcript",
+        "",
+    ]
+    for idx, text in enumerate(dialogues, 1):
+        lines.append(f"{idx}. {text}")
+    content = "\n".join(lines) + "\n"
+
+    fd, tmp = tempfile.mkstemp(dir=trans_dir, suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(content)
+    os.replace(tmp, out_path)
+    print(f"  📝 OCR transcript written: {out_path}")
+
+
+def run_vision_pipeline(image_path, reader, direction='LTR', context=None, active_ai=None, preprocess=False, binarize=False, deskew=False, debug_ocr=False, vision_model=None, series_slug=None, ocr_vault=False, ocr_only=False):
     if active_ai is None:
         active_ai = ACTIVE_AI
 
@@ -227,6 +268,14 @@ def run_vision_pipeline(image_path, reader, direction='LTR', context=None, activ
         print(f"  -> Clustered bounding boxes into {len(dialogues)} cohesive dialogue blocks:")
         for idx, text in enumerate(dialogues, 1):
             print(f"     [{idx}] {text}")
+
+        # OCR-only review surface: persist the raw transcript (no LLM) and, in
+        # --ocr-only mode, stop here — inspect raw, then compile later.
+        if ocr_vault:
+            _write_ocr_transcript(image_path, series_slug, dialogues)
+        if ocr_only:
+            print("  ⏭️ OCR-only mode: transcript written, skipping LLM synthesis.")
+            return True
 
         # Draw OCR Debug Visualizations if requested
         if debug_ocr:
@@ -368,7 +417,7 @@ from core.concurrency import RateLimiter, make_safe_print
 print = make_safe_print()
 
 
-def process_single_image(img_path, reader, direction, context, active_ai, preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter=None, vision_model=None, series_slug=None):
+def process_single_image(img_path, reader, direction, context, active_ai, preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter=None, vision_model=None, series_slug=None, ocr_vault=False, ocr_only=False, archive_after=True):
     """
     Worker function to process a single image and archive it upon completion.
     """
@@ -385,10 +434,16 @@ def process_single_image(img_path, reader, direction, context, active_ai, prepro
         deskew=deskew,
         debug_ocr=debug_ocr,
         vision_model=vision_model,
-        series_slug=series_slug
+        series_slug=series_slug,
+        ocr_vault=ocr_vault,
+        ocr_only=ocr_only,
     )
     
     if success:
+        if not archive_after:
+            # Custom scan dir (e.g. processed_images/ backfill) — already processed, don't re-archive.
+            print(f"  📦 Skipping archive (custom source dir): {img_path.name}")
+            return True
         try:
             rel_path = img_path.relative_to(INPUT_IMAGES_DIR)
         except ValueError:
@@ -422,6 +477,9 @@ def main():
     parser.add_argument("--debug-ocr", action="store_true", help="Output annotated debug image showing grouped bounding boxes and reading order")
     parser.add_argument("--workers", type=int, default=1, help="Number of concurrent worker threads (default: 1)")
     parser.add_argument("--rate-limit", type=float, default=0.0, help="Delay in seconds between LLM calls per worker (default: 0.0)")
+    parser.add_argument("--ocr-vault", action="store_true", help="Write a raw EasyOCR transcript note per page (Obsidian-ready, no LLM)")
+    parser.add_argument("--ocr-only", action="store_true", help="Run OCR + transcript only, then exit — NO LLM/Ollama calls (inspect raw, then compile)")
+    parser.add_argument("--input-dir", type=Path, default=None, help="Override the scan directory (e.g. processed_images/ to backfill transcripts)")
     args = parser.parse_args()
     direction = args.direction
     context = args.context
@@ -435,7 +493,16 @@ def main():
     series_slug = slugify(args.series) if args.series else None
     if series_slug:
         print(f"📚 Series staging: output/json_staging/{series_slug}/\n")
-    
+
+    if args.ocr_only and vision_model:
+        print("❌ --ocr-only requires the EasyOCR path — it cannot combine with --vision-model.")
+        sys.exit(1)
+    if args.ocr_vault and vision_model:
+        print("⚠️ --ocr-vault only applies to the EasyOCR path; ignoring for --vision-model.")
+
+    scan_dir = args.input_dir if args.input_dir is not None else INPUT_IMAGES_DIR
+    archive_after = args.input_dir is None  # custom dirs are already-processed — don't re-archive
+
     from config.settings import get_ai_provider
     active_ai = get_ai_provider(engine_name=args.engine, model_name=args.model)
     
@@ -447,6 +514,10 @@ def main():
         print(f"Concurrency configured: {workers} worker threads.\n")
     if rate_limit > 0:
         print(f"Rate limiting active: {rate_limit}s delay between LLM calls.\n")
+    if args.ocr_only:
+        print("OCR-only mode: transcripts only, no LLM synthesis.\n")
+    if args.ocr_vault:
+        print("OCR vault: writing per-page transcript notes.\n")
     
     # Ensure hoppers exist
     INPUT_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -456,14 +527,14 @@ def main():
     extensions = ['*.png', '*.jpg', '*.jpeg', '*.webp', '*.bmp']
     target_images = []
     for ext in extensions:
-        target_images.extend(INPUT_IMAGES_DIR.rglob(ext))
-        target_images.extend(INPUT_IMAGES_DIR.rglob(ext.upper()))
+        target_images.extend(scan_dir.rglob(ext))
+        target_images.extend(scan_dir.rglob(ext.upper()))
             
     # Remove duplicate paths just in case case-sensitivity overlaps
     target_images = sorted(list(set(target_images)))
     
     if not target_images:
-        print(f"📭 The input hopper is empty. No images found in {INPUT_IMAGES_DIR}/")
+        print(f"📭 The input hopper is empty. No images found in {scan_dir}/")
         sys.exit(0)
         
     print(f"👁️ Found {len(target_images)} images to harvest. Initializing EasyOCR Reader...")
@@ -480,7 +551,8 @@ def main():
                 executor.submit(
                     process_single_image,
                     img_path, reader, direction, context, active_ai,
-                    preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter, vision_model, series_slug
+                    preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter,
+                    vision_model, series_slug, args.ocr_vault, args.ocr_only, archive_after
                 ): img_path for img_path in target_images
             }
             for future in as_completed(futures):
@@ -499,7 +571,8 @@ def main():
             print("="*50)
             success = process_single_image(
                 img_path, reader, direction, context, active_ai,
-                preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter, vision_model, series_slug
+                preprocess, binarize, deskew, debug_ocr, PROCESSED_IMAGES_DIR, rate_limiter,
+                vision_model, series_slug, args.ocr_vault, args.ocr_only, archive_after
             )
             if success:
                 success_count += 1

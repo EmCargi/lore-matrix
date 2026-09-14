@@ -51,6 +51,7 @@ Lore Matrix V4 is the **central ETL and visualization hub** of the workspace —
 | 2026-09-14 | — | — | **Image uploader** — added `st.file_uploader` for `.png`/`.jpg`/`.jpeg`/`.webp`/`.bmp` to the same Unified Ingestor mode. Images stage in `input_images/` before vision extraction via `extract-vision.py`. Added `INPUT_IMAGES_DIR` to the browser app imports. |
 | 2026-09-14 | — | — | **Vision direction toggle** — `ingest.py` now accepts `--direction LTR/RTL` (threaded through `classify_and_route` + `run_hopper_scan` into `extract-vision.py`). Streamlit Ingest tab added a "Vision reading direction" selectbox that passes it through. LTR default, RTL for manga. |
 | 2026-09-14 | — | — | **Big-rig vision + synthesis wired** — EasyOCR (`easyocr` + `opencv-python-headless`) installed locally for text detection; `LocalProvider` default big-rig synthesis switched to `L3-8B-Stheno` (fast clean structured JSON) via `core/engines.py`. Added `generate_vision()` to `LocalProvider` + `--vision-model` flag to `extract-vision.py` (sends page image to a vision LLM, bypassing EasyOCR; default `moondream:latest`, overridable via `OLLAMA_VISION_MODEL`). Validated end-to-end on the 12-page Mingyun comic: EasyOCR+Stheno = 12/12 clean; moondream direct = reliable to run but degenerate JSON (deferred). |
+| 2026-09-14 | — | — | **OCR transcript vault** — `extract-vision.py --ocr-vault` writes a raw EasyOCR transcript note per page (`output/json_staging/ocr_transcript/<series>/page_NN.md`, no-LLM, atomic writes); `--ocr-only` exits after OCR (inspect-raw-then-compile); `--input-dir` backfills from `processed_images/`. Backfilled Mingyun 12/12. |
 | 2026-09-14 | `changelog/proposals/2026-09-14-manga-narrative-db-confirmed.md` | — | **Manga narrative DB shipped** — full triangulation (proposal → counter-plan → synthesis; supersedes the Mokuro-path draft). `extract-vision.py --series <name>` stages chunks under `output/json_staging/<slug>/`; `manga_db_loader.py` validates + persists per-series SQLite (Chronos disc layout `manga-data/<series_id>/data/<series_id>.db`, PK `(series_id, page, entry_index)`, derived `entry_id = page*1000 + entry_index`) and dual-commits a `manga_vault` Chroma collection via `nomic-embed-text` (both LAN nodes). `core/utils.slugify()` canonicalized; `vector_vault.get_collection()` gained an optional embedding_function. 6 new tests → **111 total**. Live load: Mingyun Comic 12 pages / 86 entries / 86 vectors, idempotent re-run. persona-etl handoff ready. |
 | 2026-09-14 | — | — | **Image uploader** — added `st.file_uploader` for `.png`, `.jpg`, `.jpeg`, `.webp`, `.bmp` files. Images stage in `input_images/` before vision extraction via `extract-vision.py`. |
 
@@ -236,6 +237,7 @@ class StoryEdge(BaseModel):
 - PDF ingestion (pdfplumber + LLM → LorebookLog)
 - Web ingestion (BeautifulSoup + Jina fallback + LLM, ArchiveBox snapshot support)
 - Vision ingestion (EasyOCR local + Union-Find clustering + LTR/RTL + image enhancement; big-rig L3-8B-Stheno synthesis)
+- OCR transcript vault (`--ocr-vault` + `--ocr-only` + `--input-dir` — raw EasyOCR per-page notes for HITL review, no-LLM)
 - Manga OCR ingestion (Mokuro parser)
 - Game text ingestion (deterministic, no LLM)
 - Strict table extraction (pdfplumber → CSV, no LLM)
@@ -262,7 +264,7 @@ class StoryEdge(BaseModel):
 - PDF uploader (Streamlit file_uploader → `input_pdfs/` → `extract-pdf.py`)
 - Image uploader (Streamlit file_uploader → `input_images/` → `extract-vision.py`)
 - Vision reading-direction toggle (LTR/RTL via `ingest.py --direction`, surfaced in the Streamlit Ingest tab)
-- Manga narrative DB (`manga_db_loader.py` — per-series SQLite, PK `(series_id, page, entry_index)`, series_meta provenance, idempotent upsert) + Chroma `manga_vault` dual-commit (nomic-embed-text)
+- Manga narrative DB (`manga_db_loader.py` — per-series SQLite, PK `(series_id, page, entry_index)`, series_meta provenance, idempotent upsert) + Chroma `manga_vault` dual-commit (nomic-embed-text); **consumed by persona-etl via `manga:<series_id>[:<speaker>]` intake (2026-09-14)**
 - Git local-only (9 commits, no remote — `origin` removed 2026-09-01 per the remote policy; portfolio display lives on the big rig)
 
 ## What Doesn't Work Yet
