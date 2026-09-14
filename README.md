@@ -9,6 +9,8 @@
 
 Lore Matrix is a data-engineering portfolio suite: it ingests unstructured sources — PDFs, web pages/ArchiveBox snapshots, RPG text exports, Manga OCR timelines, and images — normalizes them through strict Pydantic schemas, and persists them as relational rows (SQLite), vector embeddings (ChromaDB), and single-note repositories (Obsidian). It is built for **resilience (idempotent, schema-validated, retry-hardened), portability (provider-agnostic LLM adapter, path-agnostic resolution), and decoupling (central config, externalized prompts)**.
 
+> **📌 Project status — complete.** V4 shipped, validated end-to-end on 3 real lorebooks (150+ notes, 0 failures), polished (unified exporter, interactive visualizer, repo hygiene 2026-09-11). 103 tests green, `ruff` clean. Only foreseeable work is new extractors or prompt variants on demand. Details: [HANDOFF-lore-matrix.md](HANDOFF-lore-matrix.md).
+
 ### ⚡ At a Glance
 
 | Property | Detail |
@@ -236,6 +238,34 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) runs **ruff lint** and **
 - **Idempotency everywhere**: hash caches, `ON CONFLICT DO UPDATE` upserts, unique-constraint migrations, atomic writes (`tempfile` + `os.replace`).
 - **Never destroy data** — merge into the source vaults are forbidden; artifacts are regenerable; destructive ops are snapshot-backed.
 - **Humans and machines both** — rich console feedback for operators, and structured Pydantic models for downstream tools.
+
+---
+
+## 🧭 Quick routes
+
+| Task | First opens |
+|---|---|
+| Run the menu | [lore-matrix.py](lore-matrix.py) (15 options, subprocess orchestrator) |
+| Sweep all hoppers | [ingest.py](ingest.py) (auto-detects input type, routes to extractor) |
+| One extractor standalone | [extract-pdf.py](extract-pdf.py) / [extract-web.py](extract-web.py) / [extract-game-text.py](extract-game-text.py) / [extract-narrative.py](extract-narrative.py) / [extract-ocean.py](extract-ocean.py) / [extract-head.py](extract-head.py) |
+| Browser dashboard | `streamlit run` [browser_lore_matrix.py](browser_lore_matrix.py) |
+| JSON → Obsidian | [src/transformers/json_to_obsidian.py](src/transformers/json_to_obsidian.py) `--phase raw` (no-LLM) / `compile` / one-shot |
+| Visualize | [core/visualize-data.py](core/visualize-data.py) (bar/line/box/scatter3d/animate3d/interactive/network + MIDI JSON) |
+| Load CSV → SQLite | [sql-loader.py](sql-loader.py) (idempotent upsert) |
+| Config / providers | [config/settings.py](config/settings.py), [core/engines.py](core/engines.py) |
+| Current state | [HANDOFF-lore-matrix.md](HANDOFF-lore-matrix.md) |
+
+## 🌐 Workspace ecosystem
+
+Router: [dev/README.md](../README.md) · Vault: [Vault Home](../dev-journal/reference/Vault%20Home.md)
+
+| Sibling | What Lore Matrix feeds it | Feeder |
+|---|---|---|
+| [nme-cli](../nme-cli/nme-readme.md) | NarrativeStructure JSON (prose → graph) | [extract-narrative.py](extract-narrative.py) |
+| [shda-cli](../shda-cli/shda-readme.md) | OceanProfile + LaunchpadFeatures (VSPE) · MesoTierLLM fixture YAML (HEAD) | [extract-ocean.py](extract-ocean.py) + [extract-launchpad.py](extract-launchpad.py) · [extract-head.py](extract-head.py) |
+| [midi-project](../midi-project/README.md) | MidiDensityLog JSON (visualization) | [core/visualize-data.py](core/visualize-data.py) |
+| [digital-dm-project](../digital-dm-project/README.md) | MonsterProfile JSON + compiled vaults (SxM bestiary, Cyberpunk 2077 → console disc) | [extract-monsters.py](extract-monsters.py) + [monsters-to-md.py](monsters-to-md.py) |
+| [persona-etl](../persona-etl/persona-v2-readme.md) · [besm-loadout-forge](../besm-loadout-forge/README.md) · [aeiou-method](../aeiou-method/readme.md) · [pave-cli](../pave-cli/pave-cli-readme.md) | No direct feed — shared conventions in [AGENTS.md](../AGENTS.md) | — |
 
 ---
 

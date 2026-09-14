@@ -1,6 +1,6 @@
 ---
 project: lore-matrix
-date: 2026-09-05
+date: 2026-09-14
 status: complete
 test_count: 103
 git: local-only
@@ -19,6 +19,8 @@ Lore Matrix V4 is the **central ETL and visualization hub** of the workspace —
 - **Unified Obsidian exporter** — collapsed 3 overlapping exporters into one with `--phase raw/compile/one-shot`; pure `core/raw_vault_builder.py` (zero LLM imports), lazy `ACTIVE_AI` in config.settings; legacy pair deleted. Also fixed a silent alias-drop bug in `map_sillytavern_entry`.
 - **Interactive visualizer** — `--chart-type interactive` with matplotlib Slider + Button (manual scrub, fading trail, auto-play, arrow keys); headless falls back to GIF export. `--output` respects absolute/relative paths (bare filenames still go to `processed_data/`).
 - **Pipeline validation** — tested end-to-end on 3 real SillyTavern lorebooks (JJK, 1850's Slang, Cyberpunk 2077 — 150+ notes, 0 failures). Fixed subfolder naming (`General_Rules` → `Converted JSON`), YAML validator rejection (quoted arrays), and `.title()` acronym mangling.
+
+**Project complete 2026-09-14** — V4 shipped, validated, and polished; the repo is in maintenance. Only foreseeable work is new extractors or prompt variants on demand.
 
 ## Lineage
 
@@ -40,6 +42,7 @@ Lore Matrix V4 is the **central ETL and visualization hub** of the workspace —
 | 2026-09-02 | `2026-09-01-lore-matrix-interactive-scrubbing.md` | `2026-09-02-lore-matrix-interactive-scrubbing.md` | **Interactive scrubbing** in `core/visualize-data.py` — new `--chart-type interactive` (matplotlib Slider + Button): manual frame scrub, fading trail, auto-play, arrow-key stepping, headless fallback to GIF. Counterplan `2026-09-02-lore-matrix-interactive-scrubbing.md`. 94 tests. |
 | 2026-09-02 | `2026-09-02-lore-matrix-exporter-consolidation.md` | `2026-09-02-lore-matrix-exporter-consolidation.md` | **Unified Obsidian exporter** — pure `core/raw_vault_builder.py` (no-LLM JSON→raw unwrap, SillyTavern world-info preserved), `json_to_obsidian.py --phase raw/compile/one-shot` (lazy `ACTIVE_AI` in config.settings), legacy `json-to-md.py` + `md-to-obsidian.py` deleted. Counterplan `2026-09-02-lore-matrix-exporter-consolidation.md`. 103 tests. |
 | 2026-09-05 | — | `2026-09-05-lore-matrix-pipeline-validation.md` | **Pipeline validation** on 3 real lorebooks (JJK, 1850's Slang, Cyberpunk 2077 — 150+ notes, 0 failures). Fixed subfolder naming (`General_Rules` → `Converted JSON`), YAML validator rejection (quoted arrays), `.title()` acronym mangling. Also fixed `--output` path to respect absolute/relative paths instead of forcing `processed_data/`. |
+| 2026-09-11 | — | — | **Repo hygiene** — local data + IDE state untracked (`.obsidian/`, `config.json`, completion/targets lists); `.gitignore` extended. Runtime artifacts stay on the thin client, never ship. (Housekeeping — no proposal) |
 
 ## Architecture Overview
 
@@ -244,7 +247,7 @@ class StoryEdge(BaseModel):
 - Polymorphic gateway router (auto-detects input type)
 - Master CLI menu (15 options)
 - Streamlit browser dashboard (interactive ingest, visualize, query, export)
-- Git local-only (2 commits, no remote by design — though a GitHub remote exists for portfolio)
+- Git local-only (9 commits, no remote — `origin` removed 2026-09-01 per the remote policy; portfolio display lives on the big rig)
 
 ## What Doesn't Work Yet
 
@@ -338,7 +341,7 @@ venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive
 ## Operational Notes
 
 - **Big rig (100.73.250.56)** is never touched by tooling. Vision deps (EasyOCR, opencv, google-genai) are installed there by Megane personally.
-- **Git** is local-only with 2 commits. A GitHub remote exists (`origin`) for portfolio display, but the workflow is not push/pull — it's save states + two-node promotion.
+- **Git** is local-only (9 commits, no remote since 2026-09-01 — remotes are reserved for big-rig-hosted production projects).
 - **venv** is at `/home/megane/dev/venv/` (shared across workspace). Python is 3.12.3.
 - **Ollama fallback chain:** big-rig (`100.73.250.56:11434`, primary) → thin-client (`localhost:11434`, fallback). Big-rig hosts `gemma4-v2-Q6_K.gguf` + `qwen2.5-coder:14b`. Override primary model via `OLLAMA_PRIMARY_MODEL` env; fallback model via extractor `--model`. Chain is in `core/ollama.py` (canonical copy).
 - **CI**: `.github/workflows/ci.yml` runs `ruff check .` + `pytest` on Python 3.11 / 3.12.
@@ -358,6 +361,8 @@ venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive
 
 ## Next Session Priorities
 
+**Project complete — V4 shipped, validated, polished.** Items below are explicitly optional or intentionally deferred; there is no required work:
+
 1. ~~**Browser Export tab phase selector**~~ — ✅ Done 2026-09-06: `st.selectbox` for one-shot / raw / compile phases in `browser_lore_matrix.py`
 2. ~~**Edge cases in raw vault builder**~~ — ✅ Done 2026-09-06: empty-string alias filtering, leading `-`/`.` filename stripping, both locked with tests
 3. **Subfolder auto-differentiation** — intentionally not implemented. Source SillyTavern JSON entries carry no `type`/`category` field. `Converted JSON` is the correct default — the human-in-the-loop review of raw notes before compiling is a feature, not a limitation. Lorebooks span slang, tutorials, districts, characters, items — automated classification would require heuristics or LLM calls that violate the pure no-LLM raw unwrap guarantee.
@@ -365,4 +370,4 @@ venv/bin/python core/visualize-data.py --input data.csv --chart-type interactive
 
 ---
 
-*Handoff updated 2026-09-05. Lore Matrix V4 — the ingestion hub feeding all 7 siblings. Final polish session: unified exporter (Sept 2), interactive visualizer (Sept 2), pipeline validated on 3 real lorebooks (Sept 5), `--output` path fix. 103 tests, ruff clean, PyQt5 installed for GUI rendering. Everything ships.*
+*Handoff updated 2026-09-14. Lore Matrix V4 — the ingestion hub feeding all 7 siblings. Final polish session: unified exporter (Sept 2), interactive visualizer (Sept 2), pipeline validated on 3 real lorebooks (Sept 5), `--output` path fix. 103 tests, ruff clean, PyQt5 installed for GUI rendering. Everything ships.*
