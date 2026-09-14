@@ -52,6 +52,17 @@ CREATE TABLE IF NOT EXISTS series_meta (
     entry_count   INTEGER NOT NULL DEFAULT 0,
     last_ingested TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS corrections (
+    series_id         TEXT NOT NULL,
+    page              INTEGER NOT NULL,
+    entry_index       INTEGER NOT NULL,
+    speaker           TEXT,
+    dialogue          TEXT,
+    scene_description TEXT,
+    is_deleted        INTEGER NOT NULL DEFAULT 0,
+    updated_at        TEXT NOT NULL,
+    PRIMARY KEY (series_id, page, entry_index)
+);
 """
 
 
@@ -69,6 +80,112 @@ def resolve_db_path(series_id: str) -> Path:
 
 def _init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+
+
+def chroma_id(series_id: str, page: int, entry_index: int) -> str:
+    """Canonical Chroma vector id — the single construction point so ingest,
+    re-embed, and delete can never drift."""
+    return f"{series_id}-p{page}-e{entry_index}"
+
+
+def _open_chroma():
+    """Open the manga_vault collection (nomic-embed-text via Ollama)."""
+    import os
+    from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+    from src.storage.vector_vault import get_collection
+
+    ef = OllamaEmbeddingFunction(
+        url=os.environ.get("OLLAMA_PRIMARY_URL", "http://100.73.250.56:11434"),
+        model_name="nomic-embed-text",
+    )
+    return get_collection(name="manga_vault", embedding_function=ef)
+
+
+def apply_corrections(series_id: str, db_path: Path | None = None, embed: bool = True) -> dict:
+    """Apply the durable `corrections` table over `narrative` and re-sync Chroma.
+
+    NULL override columns are left untouched; `is_deleted=1` tombstones the row
+    (DELETE from narrative + `collection.delete`). SQLite commits first; the
+    vector sync is best-effort with a loud audit notice on failure. Auto-run by
+    the loader after every upsert; standalone via manga_db_edit.py `apply`.
+    Returns {"updated", "deleted"}.
+    """
+    db_path = db_path or resolve_db_path(series_id)
+    now = datetime.now(timezone.utc).isoformat()
+    if not db_path.exists():
+        return {"updated": 0, "deleted": 0}
+
+    upsert_docs, upsert_metas, upsert_ids = [], [], []
+    delete_ids = []
+    updated = deleted = 0
+
+    with sqlite3.connect(db_path) as conn:
+        _init_db(conn)
+        corrections = conn.execute(
+            "SELECT page, entry_index, speaker, dialogue, scene_description, is_deleted "
+            "FROM corrections WHERE series_id = ? ORDER BY page, entry_index",
+            (series_id,),
+        ).fetchall()
+        if not corrections:
+            return {"updated": 0, "deleted": 0}
+
+        for page, entry_index, speaker, dialogue, scene, is_deleted in corrections:
+            key = (series_id, page, entry_index)
+            if is_deleted:
+                conn.execute(
+                    "DELETE FROM narrative WHERE series_id=? AND page=? AND entry_index=?",
+                    key,
+                )
+                delete_ids.append(chroma_id(series_id, page, entry_index))
+                deleted += 1
+            else:
+                conn.execute(
+                    "UPDATE narrative SET speaker=COALESCE(?, speaker), "
+                    "dialogue=COALESCE(?, dialogue), "
+                    "scene_description=COALESCE(?, scene_description) "
+                    "WHERE series_id=? AND page=? AND entry_index=?",
+                    (speaker, dialogue, scene, *key),
+                )
+                row = conn.execute(
+                    "SELECT speaker, dialogue, scene_description, source_file FROM narrative "
+                    "WHERE series_id=? AND page=? AND entry_index=?",
+                    key,
+                ).fetchone()
+                if row:
+                    dialogue_txt = row[1] or ""
+                    upsert_docs.append(dialogue_txt if dialogue_txt else (row[2] or ""))
+                    upsert_metas.append({
+                        "series_id": series_id,
+                        "page": page,
+                        "speaker": row[0],
+                        "source_file": row[3],
+                    })
+                    upsert_ids.append(chroma_id(series_id, page, entry_index))
+                    updated += 1
+
+        if updated or deleted:
+            conn.execute(
+                "UPDATE series_meta SET last_ingested=? WHERE series_id=?",
+                (now, series_id),
+            )
+
+    if updated or deleted:
+        print(f"  ✏️ Corrections applied: {updated} updated, {deleted} tombstoned.")
+        if embed:
+            try:
+                collection = _open_chroma()
+                if upsert_ids:
+                    collection.upsert(
+                        documents=upsert_docs, metadatas=upsert_metas, ids=upsert_ids,
+                    )
+                    print(f"  ✅ ChromaDB: re-embedded {len(upsert_ids)} corrected vectors")
+                if delete_ids:
+                    collection.delete(ids=delete_ids)
+                    print(f"  ✅ ChromaDB: deleted {len(delete_ids)} tombstoned vectors")
+            except Exception as e:  # noqa: BLE001 - vector sync is best-effort
+                print(f"  ⚠️  ChromaDB correction sync failed (SQLite apply stands): {e}")
+
+    return {"updated": updated, "deleted": deleted}
 
 
 def _iter_chunks(series_id: str, input_dir: Path | None):
@@ -132,7 +249,7 @@ def load_series(series_id: str, display_name: str, artist: str = "",
                     "speaker": entry.Speaker,
                     "source_file": chunk_path.name,
                 })
-                chroma_ids.append(f"{series_id}-p{page}-e{idx}")
+                chroma_ids.append(chroma_id(series_id, page, idx))
         total_entries += len(entries)
         print(f"  ✅ {chunk_path.name}: {len(entries)} entries (page {page})")
 
@@ -162,21 +279,16 @@ def load_series(series_id: str, display_name: str, artist: str = "",
     # 2. ChromaDB — best-effort dual-commit (never blocks the SQLite write)
     if embed:
         try:
-            import os
-            from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
-            from src.storage.vector_vault import get_collection
-
-            ef = OllamaEmbeddingFunction(
-                url=os.environ.get("OLLAMA_PRIMARY_URL", "http://100.73.250.56:11434"),
-                model_name="nomic-embed-text",
-            )
-            collection = get_collection(name="manga_vault", embedding_function=ef)
+            collection = _open_chroma()
             collection.upsert(
                 documents=chroma_docs, metadatas=chroma_metas, ids=chroma_ids,
             )
             print(f"  ✅ ChromaDB: upserted {len(chroma_ids)} vectors → manga_vault")
         except Exception as e:  # noqa: BLE001 - vector failure is non-fatal
             print(f"  ⚠️  ChromaDB dual-commit failed (SQLite write stands): {e}")
+
+    # 3. Corrections replay — durable human fixes always win over fresh data.
+    apply_corrections(series_id, db_path, embed=embed)
 
     return {"pages": len(chunks), "entries": total_entries}
 
