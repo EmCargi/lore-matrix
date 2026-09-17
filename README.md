@@ -277,18 +277,6 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) runs **ruff lint** and **
 | Config / providers | [config/settings.py](config/settings.py), [core/engines.py](core/engines.py) |
 | Current state | [HANDOFF-lore-matrix.md](HANDOFF-lore-matrix.md) |
 
-## 🌐 Workspace ecosystem
-
-Router: [dev/README.md](../README.md) · Vault: [Vault Home](../dev-journal/reference/Vault%20Home.md)
-
-| Sibling | What Lore Matrix feeds it | Feeder |
-|---|---|---|
-| [nme-cli](../nme-cli/nme-readme.md) | NarrativeStructure JSON (prose → graph) | [extract-narrative.py](extract-narrative.py) |
-| [shda-cli](../shda-cli/shda-readme.md) | OceanProfile + LaunchpadFeatures (VSPE) · MesoTierLLM fixture YAML (HEAD) | [extract-ocean.py](extract-ocean.py) + [extract-launchpad.py](extract-launchpad.py) · [extract-head.py](extract-head.py) |
-| [midi-project](../midi-project/README.md) | MidiDensityLog JSON (visualization) | [core/visualize-data.py](core/visualize-data.py) |
-| [digital-dm-project](../digital-dm-project/README.md) | MonsterProfile JSON + compiled vaults (SxM bestiary, Cyberpunk 2077 → console disc) | [extract-monsters.py](extract-monsters.py) + [monsters-to-md.py](monsters-to-md.py) |
-| [persona-etl](../persona-etl/persona-v2-readme.md) · [besm-loadout-forge](../besm-loadout-forge/README.md) · [aeiou-method](../aeiou-method/readme.md) · [pave-cli](../pave-cli/pave-cli-readme.md) | No direct feed — shared conventions in [AGENTS.md](../AGENTS.md) | — |
-
 ---
 
 ## 📄 License
